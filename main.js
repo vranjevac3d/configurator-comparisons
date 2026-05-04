@@ -42,7 +42,7 @@ const sidebar = initSidebar(async (categoryId, option) => {
       await reloadTextures();
     }
   }
-});
+}, { leather: "901200-48", wood: "HF Custom Bramble" });
 
 // --- Renderer ---
 

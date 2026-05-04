@@ -78,7 +78,7 @@ const LEATHERS = [
   '907200-45',
 ];
 
-export function initSidebar(onChange) {
+export function initSidebar(onChange, defaults = {}) {
   const sidebar = document.getElementById('sidebar');
 
   // Header
@@ -140,7 +140,8 @@ export function initSidebar(onChange) {
 
   LEATHERS.forEach((sku, i) => {
     const btn = document.createElement('button');
-    btn.className = 'sb-swatch' + (i === 0 ? ' active' : '');
+    const isDefault = defaults.leather ? sku === defaults.leather : i === 0;
+    btn.className = 'sb-swatch' + (isDefault ? ' active' : '');
     btn.title = sku;
 
     const img = document.createElement('img');
@@ -148,7 +149,7 @@ export function initSidebar(onChange) {
     img.alt = sku;
     btn.appendChild(img);
 
-    if (i === 0) activeBtn = btn;
+    if (isDefault) activeBtn = btn;
 
     btn.addEventListener('click', () => {
       if (activeBtn) activeBtn.classList.remove('active');
@@ -179,7 +180,8 @@ export function initSidebar(onChange) {
 
   WOODS.forEach((name, i) => {
     const btn = document.createElement('button');
-    btn.className = 'sb-swatch' + (i === 0 ? ' active' : '');
+    const isDefault = defaults.wood ? name === defaults.wood : i === 0;
+    btn.className = 'sb-swatch' + (isDefault ? ' active' : '');
     btn.title = name;
 
     const img = document.createElement('img');
@@ -187,7 +189,7 @@ export function initSidebar(onChange) {
     img.alt = name;
     btn.appendChild(img);
 
-    if (i === 0) activeWoodBtn = btn;
+    if (isDefault) activeWoodBtn = btn;
 
     btn.addEventListener('click', () => {
       if (activeWoodBtn) activeWoodBtn.classList.remove('active');
