@@ -259,7 +259,7 @@ gltfLoader.setDRACOLoader(dracoLoader);
 
 metrics.markLoadStart();
 
-gltfLoader.load(`/${SKU}/${SKU}.gltf`, (gltf) => {
+gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
   metrics.markLoadEnd();
 
   const model = gltf.scene;
@@ -306,8 +306,9 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, (gltf) => {
   contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
   updateContactShadow();
 
-  applyLeather("901200-87");
+  await applyLeather("901200-87");
 
+  document.getElementById("loading").classList.add("hidden");
   metrics.markModelLoaded();
 });
 
