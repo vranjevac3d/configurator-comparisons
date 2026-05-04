@@ -4,6 +4,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { contactShadow, blurShadow } from "./contactShadow.js";
+import { buildNails } from "./nails.js";
 import { initSidebar } from "./sidebar.js";
 import { MetricsTracker } from "./metrics.js";
 
@@ -295,6 +296,7 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
     }
   });
 
+  buildNails(model);
   scene.add(model);
 
   const size = box.getSize(new THREE.Vector3());
