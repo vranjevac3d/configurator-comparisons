@@ -65,6 +65,12 @@ const CATEGORIES = [
   },
 ];
 
+const WOODS = [
+  'HF Custom Natural',
+  'HF Custom Bramble',
+  'HF Custom Java',
+];
+
 const LEATHERS = [
   '901200-87',
   '901200-48', '901200-99',
@@ -156,6 +162,45 @@ export function initSidebar(onChange) {
 
   leatherRow.appendChild(swatchGrid);
   configEl.appendChild(leatherRow);
+
+  // Wood swatch picker
+  const woodRow = document.createElement('div');
+  woodRow.className = 'sb-row';
+
+  const woodLabel = document.createElement('div');
+  woodLabel.className = 'sb-row-label';
+  woodLabel.textContent = 'Wood';
+  woodRow.appendChild(woodLabel);
+
+  const woodGrid = document.createElement('div');
+  woodGrid.className = 'sb-swatches';
+
+  let activeWoodBtn = null;
+
+  WOODS.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'sb-swatch' + (i === 0 ? ' active' : '');
+    btn.title = name;
+
+    const img = document.createElement('img');
+    img.src = `/wood/${name}/${name}_icon.webp`;
+    img.alt = name;
+    btn.appendChild(img);
+
+    if (i === 0) activeWoodBtn = btn;
+
+    btn.addEventListener('click', () => {
+      if (activeWoodBtn) activeWoodBtn.classList.remove('active');
+      btn.classList.add('active');
+      activeWoodBtn = btn;
+      onChange?.('wood', name);
+    });
+
+    woodGrid.appendChild(btn);
+  });
+
+  woodRow.appendChild(woodGrid);
+  configEl.appendChild(woodRow);
 
   sidebar.appendChild(configEl);
 

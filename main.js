@@ -13,6 +13,8 @@ import { MetricsTracker } from "./metrics.js";
 const sidebar = initSidebar((categoryId, option) => {
   if (categoryId === "leather") {
     applyLeather(option);
+  } else if (categoryId === "wood") {
+    applyWood(option);
   }
 });
 
@@ -219,6 +221,9 @@ async function loadLeatherTextures(sku) {
     loadTexture(`${base}_roughness.jpg`),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
+  map.repeat.set(10, 10);
+  normalMap.repeat.set(10, 10);
+  roughnessMap.repeat.set(10, 10);
   leatherTexCache[sku] = { map, normalMap, roughnessMap };
   return leatherTexCache[sku];
 }
@@ -248,6 +253,40 @@ async function applyLeather(sku) {
   });
 
   updateContactShadow();
+}
+
+// --- Wood texture switcher ---
+
+const woodTexCache = {};
+
+async function loadWoodTextures(name) {
+  if (woodTexCache[name]) return woodTexCache[name];
+  const base = `/wood/${name}/${name}`;
+  const [map, normalMap, roughnessMap] = await Promise.all([
+    loadTexture(`${base}.jpg`),
+    loadTexture(`${base}_normal.jpg`),
+    loadTexture(`${base}_roughness.jpg`),
+  ]);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.repeat.set(10, 10);
+  normalMap.repeat.set(10, 10);
+  roughnessMap.repeat.set(10, 10);
+  woodTexCache[name] = { map, normalMap, roughnessMap };
+  return woodTexCache[name];
+}
+
+async function applyWood(name) {
+  if (!loadedModel) return;
+  const tex = await loadWoodTextures(name);
+  loadedModel.traverse((node) => {
+    if (!node.isMesh) return;
+    const mat = node.material;
+    if (!mat || !mat.name.includes("wood")) return;
+    mat.map          = tex.map;
+    mat.normalMap    = tex.normalMap;
+    mat.roughnessMap = tex.roughnessMap;
+    mat.needsUpdate  = true;
+  });
 }
 
 // --- Load model ---
@@ -309,6 +348,7 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
   updateContactShadow();
 
   await applyLeather("901200-87");
+  await applyWood("HF Custom Natural");
 
   document.getElementById("loading").classList.add("hidden");
   metrics.markModelLoaded();
