@@ -4,6 +4,10 @@ const CATEGORIES = [
     options: ['JPG', 'WebP', 'KTX2', 'AVIF'], default: 'JPG',
   },
   {
+    id: 'resolution', label: 'Texture Resolution',
+    options: ['2K', '1K', '512px'], default: '2K',
+  },
+  {
     id: 'modelComplexity', label: 'Model Complexity',
     options: ['High poly', 'Low poly + Normal', 'Low poly + AO'], default: 'High poly',
   },
@@ -38,10 +42,6 @@ const CATEGORIES = [
   {
     id: 'renderer', label: 'Renderer',
     options: ['WebGL2', 'WebGPU'], default: 'WebGL2',
-  },
-  {
-    id: 'resolution', label: 'Texture Resolution',
-    options: ['4K', '2K', '1K', '512px'], default: '2K',
   },
   {
     id: 'mipmaps', label: 'Mipmaps',

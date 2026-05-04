@@ -225,6 +225,26 @@ body {
   to { transform: rotate(360deg); }
 }
 
+#tex-loading {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--c-border);
+  border-top-color: var(--c-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+  z-index: 50;
+}
+
+#tex-loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ── Viewport ─────────────────────────────────────────── */
 
 #viewport {

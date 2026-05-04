@@ -14,6 +14,14 @@ export class MetricsTracker {
   markLoadStart() { this._loadStart = performance.now(); }
   markLoadEnd()   { this._loadEnd   = performance.now(); }
 
+  reset() {
+    this._samples         = [];
+    this._loadStart       = null;
+    this._loadEnd         = null;
+    this._firstRenderTime = null;
+    this._modelLoaded     = false;
+  }
+
   tick() {
     const now = performance.now();
     const fps = 1000 / (now - this._last);

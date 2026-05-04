@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { contactShadow, blurShadow } from "./contactShadow.js";
 import { buildNails } from "./nails.js";
 import { initSidebar } from "./sidebar.js";
@@ -10,11 +11,36 @@ import { MetricsTracker } from "./metrics.js";
 
 // --- Sidebar ---
 
-const sidebar = initSidebar((categoryId, option) => {
+const loadingEl = document.getElementById("loading");
+const texLoadingEl = document.getElementById("tex-loading");
+
+async function reloadTextures() {
+  texLoadingEl.classList.remove("hidden");
+  metrics.reset();
+  metrics.markLoadStart();
+  await Promise.all([applyLeather(currentLeather), applyWood(currentWood)]);
+  metrics.markLoadEnd();
+  metrics.markModelLoaded();
+  texLoadingEl.classList.add("hidden");
+}
+
+const sidebar = initSidebar(async (categoryId, option) => {
   if (categoryId === "leather") {
     applyLeather(option);
   } else if (categoryId === "wood") {
     applyWood(option);
+  } else if (categoryId === "textures") {
+    const extMap = { JPG: "jpg", WebP: "webp", KTX2: "ktx2", AVIF: "avif" };
+    if (extMap[option]) {
+      currentTexExt = extMap[option];
+      await reloadTextures();
+    }
+  } else if (categoryId === "resolution") {
+    const resMap = { "2K": "2k", "1K": "1k", "512px": "512" };
+    if (resMap[option]) {
+      currentRes = resMap[option];
+      await reloadTextures();
+    }
   }
 });
 
@@ -154,15 +180,27 @@ function materialFallbacksOnMain(name) {
 
 // --- Load baked maps ---
 
+let _ktx2Loader = null;
+function getKTX2Loader() {
+  if (!_ktx2Loader) {
+    _ktx2Loader = new KTX2Loader();
+    _ktx2Loader.setTranscoderPath('/basis/');
+    _ktx2Loader.detectSupport(renderer);
+  }
+  return _ktx2Loader;
+}
+
 function loadTexture(path) {
-  return new Promise((resolve) => {
-    new THREE.TextureLoader().load(path, (tex) => {
+  return new Promise((resolve, reject) => {
+    const isKTX2 = path.endsWith('.ktx2');
+    const loader = isKTX2 ? getKTX2Loader() : new THREE.TextureLoader();
+    loader.load(path, (tex) => {
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
       tex.flipY = false;
-      tex.colorSpace = THREE.NoColorSpace;
+      if (!isKTX2) tex.colorSpace = THREE.NoColorSpace;
       resolve(tex);
-    });
+    }, undefined, (err) => reject(new Error(`Failed to load texture: ${path}`)));
   });
 }
 
@@ -173,9 +211,71 @@ const leatherBake = {
   aoMap:     await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`),
 };
 
+// --- Normal-blend shader (baked large-scale + tiling detail, like pwa) ---
+
+const normalBlendChunk = `
+#ifdef USE_NORMALMAP_OBJECTSPACE
+
+	normal = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
+
+	#ifdef FLIP_SIDED
+		normal = - normal;
+	#endif
+	#ifdef DOUBLE_SIDED
+		normal = normal * faceDirection;
+	#endif
+
+	normal = normalize( normalMatrix * normal );
+
+#elif defined( USE_NORMALMAP_TANGENTSPACE )
+
+	vec3 bakeN   = texture2D( normalMap,  vNormalMapUv ).xyz * 2.0 - 1.0;
+	vec3 detailN = texture2D( normalMap2, vLeatherDetailUv ).xyz * 2.0 - 1.0;
+	vec3 mapN = mix( bakeN, detailN, 0.4 );
+	mapN.xy *= normalScale;
+
+	normal = normalize( tbn * mapN );
+
+#elif defined( USE_BUMPMAP )
+
+	normal = perturbNormalArb( - vViewPosition, normal, dHdxy_fwd(), faceDirection );
+
+#endif
+`;
+
+function setupNormalBlend(mat) {
+  mat.onBeforeCompile = (shader) => {
+    mat.userData.shader = shader;
+    shader.uniforms.normalMap2 = { value: mat.userData.detailNormal || leatherBake.normalMap };
+
+    // Inject a UV0×10 varying that's always available (vMapUv only exists when USE_MAP is active)
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <uv_pars_vertex>',
+      '#include <uv_pars_vertex>\nvarying vec2 vLeatherDetailUv;'
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <uv_vertex>',
+      '#include <uv_vertex>\nvLeatherDetailUv = uv * 10.0;'
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <normalmap_pars_fragment>',
+      '#include <normalmap_pars_fragment>\nuniform sampler2D normalMap2;\nvarying vec2 vLeatherDetailUv;'
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <normal_fragment_maps>',
+      normalBlendChunk
+    );
+  };
+}
+
 // --- Scene state ---
 
 let loadedModel = null;
+let currentLeather = "901200-48";
+let currentWood = "HF Custom Natural";
+let currentTexExt = "jpg";
+let currentRes = "2k";
 
 // --- Contact shadow setup ---
 
@@ -212,44 +312,55 @@ function updateContactShadow() {
 
 const leatherTexCache = {};
 
-async function loadLeatherTextures(sku) {
-  if (leatherTexCache[sku]) return leatherTexCache[sku];
-  const base = `/leathers/${sku}/${sku}`;
+async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
+  const key = `${sku}_${res}_${ext}`;
+  if (leatherTexCache[key]) return leatherTexCache[key];
+  const base = `/leathers/${sku}/${res}/${sku}`;
   const [map, normalMap, roughnessMap] = await Promise.all([
-    loadTexture(`${base}.jpg`),
-    loadTexture(`${base}_normal.jpg`),
-    loadTexture(`${base}_roughness.jpg`),
+    loadTexture(`${base}.${ext}`),
+    loadTexture(`${base}_normal.${ext}`),
+    loadTexture(`${base}_roughness.${ext}`),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
   normalMap.repeat.set(10, 10);
   roughnessMap.repeat.set(10, 10);
-  leatherTexCache[sku] = { map, normalMap, roughnessMap };
-  return leatherTexCache[sku];
+  leatherTexCache[key] = { map, normalMap, roughnessMap };
+  return leatherTexCache[key];
 }
 
 async function applyLeather(sku) {
+  currentLeather = sku;
   if (!loadedModel) return;
-  const tex = await loadLeatherTextures(sku);
+  const tex = await loadLeatherTextures(sku, currentTexExt, currentRes);
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
     const mat = node.material;
     if (!mat) return;
-    if (!materialWithBake(mat.name) && !mat.name.includes('welt')) return;
+
+    const isBake = materialWithBake(mat.name);
+    const isWelt = !isBake && mat.name.includes('welt');
+    if (!isBake && !isWelt) return;
 
     mat.map          = tex.map;
-    mat.normalMap    = tex.normalMap;
     mat.roughnessMap = tex.roughnessMap;
 
-    mat.aoMap = leatherBake.aoMap;
-
-    if (materialFallbacksOnMain(mat.name)) {
-      mat.aoMap.channel     = 1;
+    if (isBake) {
+      // Keep mat.normalMap = baked normal (set in model load).
+      // Deliver the tiling leather detail via normalMap2 uniform.
+      mat.userData.detailNormal = tex.normalMap;
+      if (mat.userData.shader) {
+        mat.userData.shader.uniforms.normalMap2.value = tex.normalMap;
+      } else {
+        mat.needsUpdate = true; // force compile so onBeforeCompile picks up detailNormal
+      }
+    } else {
+      // Welt: no bake setup, just assign the tiling normal directly
+      mat.normalMap        = tex.normalMap;
       mat.normalMap.channel = 0;
+      mat.needsUpdate      = true;
     }
-
-    mat.needsUpdate = true;
   });
 
   updateContactShadow();
@@ -259,25 +370,27 @@ async function applyLeather(sku) {
 
 const woodTexCache = {};
 
-async function loadWoodTextures(name) {
-  if (woodTexCache[name]) return woodTexCache[name];
-  const base = `/wood/${name}/${name}`;
+async function loadWoodTextures(name, ext = "jpg", res = "2k") {
+  const key = `${name}_${res}_${ext}`;
+  if (woodTexCache[key]) return woodTexCache[key];
+  const base = `/wood/${name}/${res}/${name}`;
   const [map, normalMap, roughnessMap] = await Promise.all([
-    loadTexture(`${base}.jpg`),
-    loadTexture(`${base}_normal.jpg`),
-    loadTexture(`${base}_roughness.jpg`),
+    loadTexture(`${base}.${ext}`),
+    loadTexture(`${base}_normal.${ext}`),
+    loadTexture(`${base}_roughness.${ext}`),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
   normalMap.repeat.set(10, 10);
   roughnessMap.repeat.set(10, 10);
-  woodTexCache[name] = { map, normalMap, roughnessMap };
-  return woodTexCache[name];
+  woodTexCache[key] = { map, normalMap, roughnessMap };
+  return woodTexCache[key];
 }
 
 async function applyWood(name) {
+  currentWood = name;
   if (!loadedModel) return;
-  const tex = await loadWoodTextures(name);
+  const tex = await loadWoodTextures(name, currentTexExt, currentRes);
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
     const mat = node.material;
@@ -318,19 +431,21 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
     if (!mat) return;
 
     if (materialWithBake(mat.name)) {
-      mat.normalMap = leatherBake.normalMap;
-      mat.aoMap     = leatherBake.aoMap;
-      mat.needsUpdate = true;
-    }
+      const isFallback = materialFallbacksOnMain(mat.name);
+      const hasUV1 = isFallback && !!node.geometry.attributes.uv1;
 
-    if (materialFallbacksOnMain(mat.name)) {
-      if (node.geometry.attributes.uv1) {
-        mat.defines = mat.defines || {};
-        mat.defines.USE_UV1 = "";
-        mat.defines.MAP_UV1 = "uv1";
+      // Clone per-material so channel assignments don't cross-contaminate the shared texture
+      if (hasUV1) {
+        const n = leatherBake.normalMap.clone(); n.channel = 1;
+        const a = leatherBake.aoMap.clone();     a.channel = 1;
+        mat.normalMap = n;
+        mat.aoMap     = a;
+      } else {
+        mat.normalMap = leatherBake.normalMap;
+        mat.aoMap     = leatherBake.aoMap;
       }
-      if (mat.aoMap)     mat.aoMap.channel     = 1;
-      if (mat.normalMap) mat.normalMap.channel = 1;
+
+      setupNormalBlend(mat);
       mat.needsUpdate = true;
     }
   });
@@ -347,8 +462,8 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
   contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
   updateContactShadow();
 
-  await applyLeather("901200-87");
-  await applyWood("HF Custom Natural");
+  await applyLeather("901200-48");
+  await applyWood("HF Custom Bramble");
 
   document.getElementById("loading").classList.add("hidden");
   metrics.markModelLoaded();
