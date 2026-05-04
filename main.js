@@ -41,8 +41,10 @@ const sidebar = initSidebar(async (categoryId, option) => {
       currentRes = resMap[option];
       await reloadTextures();
     }
+  } else if (categoryId === "shadows") {
+    setShadowMode(option);
   }
-}, { leather: "901200-48", wood: "HF Custom Bramble" });
+}, { leather: "906700-81", wood: "HF Custom Bramble" });
 
 // --- Renderer ---
 
@@ -76,34 +78,26 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
-// --- Lighting (hookerfurniture-pwa SSW preset) ---
+// --- Lighting (hookerfurniture-pwa default preset) ---
 
 const spotLight = new THREE.DirectionalLight(0xffffff, 0.6);
 spotLight.position.set(0, 22, 14);
 scene.add(spotLight);
 
 const shadowLight = new THREE.DirectionalLight(0xffffff, 0.8);
-shadowLight.position.set(5, 3, 13);
+shadowLight.position.set(-5, 3, 13);
 shadowLight.castShadow = true;
 shadowLight.shadow.bias = -0.0001;
 shadowLight.shadow.radius = 20;
 shadowLight.shadow.mapSize.set(2048, 2048);
 scene.add(shadowLight);
 
-const backLight = new THREE.DirectionalLight(0xffffff, 0.6);
-backLight.position.set(0, 0, -30);
-backLight.castShadow = true;
-backLight.shadow.bias = -0.0001;
-backLight.shadow.radius = 20;
-backLight.shadow.mapSize.set(2048, 2048);
-scene.add(backLight);
-
 const cameraLight = new THREE.DirectionalLight(0xffffff, 1);
-cameraLight.position.set(4, 2, 2);
+cameraLight.position.set(-2, 2, 2);
 camera.add(cameraLight);
 scene.add(camera);
 
-const ambientLight = new THREE.AmbientLight(0x161616, 0.0035);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.0035);
 scene.add(ambientLight);
 
 // --- HDR environment ---
@@ -269,10 +263,27 @@ function setupNormalBlend(mat) {
   };
 }
 
+// --- Shadow mode ---
+
+function setShadowMode(mode) {
+  const realtimeLights = [shadowLight];
+
+  const useRealtime = mode === 'Real-time' || mode === 'Real-time + Contact' || mode === 'All';
+  const useContact  = mode === 'Contact only' || mode === 'Real-time + Contact' || mode === 'All';
+
+  renderer.shadowMap.enabled = useRealtime;
+  realtimeLights.forEach(l => { l.castShadow = useRealtime; });
+  if (loadedModel) loadedModel.traverse(n => {
+    if (n.isMesh) { n.castShadow = useRealtime; n.receiveShadow = useRealtime; }
+  });
+  shadowGroup.visible = useContact;
+  // 'Baked' and 'All' baked component — no-op until lightmap asset exists
+}
+
 // --- Scene state ---
 
 let loadedModel = null;
-let currentLeather = "901200-48";
+let currentLeather = "906700-81";
 let currentWood = "HF Custom Natural";
 let currentTexExt = "jpg";
 let currentRes = "2k";
@@ -461,8 +472,9 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
 
   contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
   updateContactShadow();
+  setShadowMode('Real-time + Contact');
 
-  await applyLeather("901200-48");
+  await applyLeather("906700-81");
   await applyWood("HF Custom Bramble");
 
   document.getElementById("loading").classList.add("hidden");

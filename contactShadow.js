@@ -1,6 +1,5 @@
 import {
   Box3,
-  Group,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
@@ -14,13 +13,7 @@ import { VerticalBlurShader } from "three/addons/shaders/VerticalBlurShader.js";
 let blurPlane, horizontalBlurMaterial, verticalBlurMaterial;
 
 export function contactShadow(model, scene, floorPlane, shadowGroup, renderTarget, camera) {
-  scene.children.forEach((x) => {
-    if (x.name === "Shadow Group") scene.remove(x);
-  });
-
-  const group = new Group();
-  group.name = "Shadow Group";
-  scene.add(group);
+  while (shadowGroup.children.length) shadowGroup.remove(shadowGroup.children[0]);
 
   const bbox = new Box3().setFromObject(model);
 
@@ -61,8 +54,7 @@ export function contactShadow(model, scene, floorPlane, shadowGroup, renderTarge
 
   const children = [shadowPlane, blurPlane, camera];
   if (floorPlane) children.push(floorPlane);
-  group.add(...children);
-  shadowGroup.children = group.children;
+  shadowGroup.add(...children);
 
   horizontalBlurMaterial = new ShaderMaterial(HorizontalBlurShader);
   horizontalBlurMaterial.depthTest = false;

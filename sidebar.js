@@ -37,7 +37,7 @@ const CATEGORIES = [
   },
   {
     id: 'shadows', label: 'Shadows',
-    options: ['Real-time', 'Baked', 'Contact only', 'None'], default: 'Contact only',
+    options: ['Real-time', 'Real-time + Contact', 'Baked', 'Contact only', 'All', 'None'], default: 'Real-time + Contact',
   },
   {
     id: 'renderer', label: 'Renderer',
