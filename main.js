@@ -282,6 +282,9 @@ function setShadowMode(mode) {
 
 // --- Scene state ---
 
+const player = { model: null };
+window.player = player;
+
 let loadedModel = null;
 let currentLeather = "906700-81";
 let currentWood = "HF Custom Natural";
@@ -428,6 +431,7 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
 
   const model = gltf.scene;
   loadedModel = model;
+  player.model = model;
 
   const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
