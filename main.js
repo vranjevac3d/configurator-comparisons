@@ -291,18 +291,26 @@ function setupNormalBlend(mat) {
 // --- Shadow mode ---
 
 function setShadowMode(mode) {
-  const realtimeLights = [shadowLight];
-
-  const useRealtime = mode === 'Real-time' || mode === 'Real-time + Contact' || mode === 'All';
-  const useContact  = mode === 'Contact only' || mode === 'Real-time + Contact' || mode === 'All';
+  // real-time:         RT on model + floor,  no contact,  no baked floor
+  // real-time+contact: RT on model,           contact,     no baked floor
+  // baked:             no RT,                 no contact,  baked floor
+  // contact only:      no RT,                 contact,     no baked floor
+  // all:               RT on model,   no contact,  baked floor
+  // none:              nothing
+  const useRealtime = ['Real-time', 'Real-time + Contact', 'All'].includes(mode);
+  const useContact  = ['Real-time + Contact', 'Contact only'].includes(mode);
+  const useBaked    = ['Baked', 'All'].includes(mode);
+  const useRTFloor  = mode === 'Real-time';
 
   renderer.shadowMap.enabled = useRealtime;
-  realtimeLights.forEach(l => { l.castShadow = useRealtime; });
+  shadowLight.castShadow = useRealtime;
   if (loadedModel) loadedModel.traverse(n => {
     if (n.isMesh) { n.castShadow = useRealtime; n.receiveShadow = useRealtime; }
   });
-  shadowGroup.visible = useContact;
-  // 'Baked' and 'All' baked component — no-op until lightmap asset exists
+
+  if (shadowGroup) shadowGroup.visible = useContact;
+  if (floorMesh)   floorMesh.visible   = useBaked;
+  if (rtFloor)     rtFloor.visible     = useRTFloor;
 }
 
 // --- Scene state ---
@@ -311,6 +319,8 @@ const player = { model: null };
 window.player = player;
 
 let loadedModel = null;
+let floorMesh   = null;
+let rtFloor     = null;
 let currentLeather = "906700-81";
 let currentWood = "HF Custom Natural";
 let currentTexExt = "jpg";
@@ -402,7 +412,6 @@ async function applyLeather(sku) {
     }
   });
 
-  updateContactShadow();
 }
 
 // --- Wood texture switcher ---
@@ -503,6 +512,28 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
   controls.target.set(0, 0, 0);
   controls.update();
 
+  // Baked floor shadow (Floor.png) — used in 'Baked' mode
+  const floorTex = await loadTexture(`/${SKU}/Floor.png`);
+  floorTex.flipY = true;
+  floorMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
+  );
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.position.y = -size.y / 2;
+  scene.add(floorMesh);
+
+  // Real-time shadow receiver — used in 'Real-time' and 'All' modes
+  rtFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(size.x * 4, size.z * 4),
+    new THREE.ShadowMaterial({ opacity: 0.35 })
+  );
+  rtFloor.rotation.x = -Math.PI / 2;
+  rtFloor.position.y = -size.y / 2;
+  rtFloor.receiveShadow = true;
+  scene.add(rtFloor);
+
+  // Dynamic contact shadow — used in 'Real-time + Contact' and 'Contact only' modes
   contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
   updateContactShadow();
   setShadowMode('Real-time + Contact');
