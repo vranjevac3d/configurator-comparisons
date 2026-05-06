@@ -269,9 +269,12 @@ function setupNormalBlend(mat, useUV1ForAO2 = false) {
       '#include <uv_pars_vertex>',
       '#include <uv_pars_vertex>\nvarying vec2 vLeatherDetailUv;\nvarying vec2 vAoMap2Uv;'
     );
+    const ao2UvAssign = useUV1ForAO2
+      ? '#ifdef USE_UV1\nvAoMap2Uv = uv1;\n#else\nvAoMap2Uv = uv;\n#endif'
+      : 'vAoMap2Uv = uv;';
     shader.vertexShader = shader.vertexShader.replace(
       '#include <uv_vertex>',
-      `#include <uv_vertex>\nvLeatherDetailUv = uv * 10.0;\nvAoMap2Uv = ${useUV1ForAO2 ? 'uv1' : 'uv'};`
+      `#include <uv_vertex>\nvLeatherDetailUv = uv * 10.0;\n${ao2UvAssign}`
     );
 
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -303,6 +306,7 @@ function setFabricMode(mode) {
   const showNormal    = mode === 'Full PBR' || mode === 'Normal Map';
   const showRoughness = mode === 'Full PBR';
   const showAO        = mode === 'Full PBR' || mode === 'AO Map';
+  const aoIntensity   = mode === 'AO Map' ? 4 : 1;
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
@@ -318,6 +322,7 @@ function setFabricMode(mode) {
     mat.roughnessMap = showRoughness ? mat.userData.fullPBR_roughnessMap ?? mat.roughnessMap : null;
     if (isBake) {
       mat.aoMap = showAO ? (mat.userData.fullPBR_aoMap ?? mat.aoMap) : null;
+      mat.aoMapIntensity = aoIntensity;
       const ao2 = showAO && bakedShadow && mat.userData.bakedShadowsAO
         ? mat.userData.bakedShadowsAO
         : neutralAO;
