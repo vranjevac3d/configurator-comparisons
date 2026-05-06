@@ -57,8 +57,6 @@ const sidebar = initSidebar(async (categoryId, option) => {
     setEnvLighting(option);
   } else if (categoryId === "compression") {
     setCompression(option);
-  } else if (categoryId === "mipmaps") {
-    setMipmaps(option);
   } else if (categoryId === "anisotropy") {
     setAnisotropy(option);
   } else if (categoryId === "gtao") {
@@ -428,34 +426,6 @@ function setEnvLighting(mode) {
     scene.environment = null;
     ambientLight.intensity = 1.0;
   }
-}
-
-// --- Mipmaps ---
-
-function setMipmaps(mode) {
-  const on = mode === 'On';
-  const minFilter = on ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-
-  const seen = new Set();
-  function applyTo(tex) {
-    if (!tex || seen.has(tex)) return;
-    seen.add(tex);
-    tex.generateMipmaps = on;
-    tex.minFilter = minFilter;
-    tex.needsUpdate = true;
-  }
-
-  if (loadedModel) {
-    loadedModel.traverse(node => {
-      if (!node.isMesh || !node.material) return;
-      const mat = node.material;
-      ['map', 'normalMap', 'roughnessMap', 'aoMap', 'emissiveMap', 'metalnessMap'].forEach(k => applyTo(mat[k]));
-    });
-  }
-
-  [leatherBake.normalMap, leatherBake.aoMap, leatherBake.leatherAO].forEach(applyTo);
-  Object.values(leatherTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
-  Object.values(woodTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
 }
 
 // --- Anisotropy ---

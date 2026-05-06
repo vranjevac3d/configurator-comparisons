@@ -48,10 +48,6 @@ const CATEGORIES = [
     options: ['WebGL2', 'WebGPU'], default: 'WebGL2',
   },
   {
-    id: 'mipmaps', label: 'Mipmaps',
-    options: ['On', 'Off'], default: 'On',
-  },
-  {
     id: 'anisotropy', label: 'Anisotropy',
     options: ['1x', '2x', '4x', '8x', 'MAX'], default: '4x',
   },
