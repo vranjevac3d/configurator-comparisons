@@ -49,6 +49,8 @@ const sidebar = initSidebar(async (categoryId, option) => {
     setFabricMode(option);
   } else if (categoryId === "envLighting") {
     setEnvLighting(option);
+  } else if (categoryId === "compression") {
+    setCompression(option);
   } else if (categoryId === "mipmaps") {
     setMipmaps(option);
   } else if (categoryId === "anisotropy") {
@@ -453,8 +455,9 @@ let currentLeather = "906700-81";
 let currentWood = "HF Custom Natural";
 let currentTexExt = "jpg";
 let currentRes = "2k";
-let currentFabric = "Full PBR";
-let currentShadow = "Real-time + Contact";
+let currentFabric       = "Full PBR";
+let currentShadow       = "Real-time + Contact";
+let currentCompression  = "Draco";
 
 // --- Camera tween ---
 
@@ -615,107 +618,137 @@ dracoLoader.setDecoderPath("/draco/");
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
 
-metrics.markLoadStart();
+async function loadAndSetupModel(path) {
+  loadingEl.classList.remove('hidden');
+  metrics.reset();
+  metrics.markLoadStart();
 
-gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
-  metrics.markLoadEnd();
+  if (loadedModel) {
+    scene.remove(loadedModel);
+    loadedModel.traverse(n => { if (n.isMesh) n.geometry.dispose(); });
+    loadedModel = null;
+    player.model = null;
+  }
 
-  const model = gltf.scene;
-  loadedModel = model;
-  player.model = model;
+  if (floorMesh) { scene.remove(floorMesh); floorMesh = null; }
+  if (rtFloor)   { scene.remove(rtFloor);   rtFloor   = null; }
 
-  const box = new THREE.Box3().setFromObject(model);
-  const center = box.getCenter(new THREE.Vector3());
-  model.position.sub(center);
+  while (shadowGroup.children.length) {
+    const c = shadowGroup.children[0];
+    c.geometry?.dispose();
+    c.material?.dispose();
+    shadowGroup.remove(c);
+  }
 
-  model.traverse((node) => {
-    if (!node.isMesh) return;
-    node.castShadow = true;
-    node.receiveShadow = true;
+  return new Promise((resolve, reject) => {
+    gltfLoader.load(path, async (gltf) => {
+      metrics.markLoadEnd();
 
-    const mat = node.material;
-    if (!mat) return;
+      const model = gltf.scene;
+      loadedModel  = model;
+      player.model = model;
 
-    if (materialWithBake(mat.name)) {
-      const isFallback = materialFallbacksOnMain(mat.name);
-      const hasUV1 = isFallback && !!node.geometry.attributes.uv1;
+      const box    = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
 
-      const isArm = mat.name === 'arm' || mat.name.startsWith('arm_');
+      model.traverse((node) => {
+        if (!node.isMesh) return;
+        node.castShadow    = true;
+        node.receiveShadow = true;
 
-      if (hasUV1) {
-        const n = leatherBake.normalMap.clone(); n.channel = 1;
-        mat.normalMap = n;
-        const ao = leatherBake.leatherAO.clone(); ao.channel = 1;
-        mat.aoMap = ao;
-      } else {
-        mat.normalMap = leatherBake.normalMap;
-        mat.aoMap = leatherBake.leatherAO;
+        const mat = node.material;
+        if (!mat) return;
+
+        if (materialWithBake(mat.name)) {
+          const isFallback = materialFallbacksOnMain(mat.name);
+          const hasUV1     = isFallback && !!node.geometry.attributes.uv1;
+          const isArm      = mat.name === 'arm' || mat.name.startsWith('arm_');
+
+          if (hasUV1) {
+            const n = leatherBake.normalMap.clone(); n.channel = 1;
+            mat.normalMap = n;
+            const ao = leatherBake.leatherAO.clone(); ao.channel = 1;
+            mat.aoMap = ao;
+          } else {
+            mat.normalMap = leatherBake.normalMap;
+            mat.aoMap     = leatherBake.leatherAO;
+          }
+          if (!isArm) mat.userData.bakedShadowsAO = leatherBake.aoMap;
+
+          mat.userData.fullPBR_normalMap = mat.normalMap;
+          mat.userData.fullPBR_aoMap     = mat.aoMap;
+          mat.userData.pendingAoMap2     = neutralAO;
+          setupNormalBlend(mat, hasUV1);
+          mat.needsUpdate = true;
+        }
+      });
+
+      buildNails(model);
+      scene.add(model);
+
+      const size   = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      if (!armCamPos) {
+        const defaultCamPos    = new THREE.Vector3(0, size.y * 0.5, maxDim * 1.8);
+        const defaultCamTarget = new THREE.Vector3(0, 0, 0);
+        camera.position.copy(defaultCamPos);
+        controls.target.copy(defaultCamTarget);
+        controls.update();
+
+        armCamTarget  = new THREE.Vector3(-size.x * 0.38, size.y * 0.15, size.z * 0.1);
+        armCamPos     = new THREE.Vector3(-size.x * 0.5,  size.y * 0.3,  size.z * 0.55);
+        seatCamTarget = new THREE.Vector3(0, size.y * 0.12, size.z * 0.15);
+        seatCamPos    = new THREE.Vector3(0, size.y * 0.65, size.z * 0.7);
+
+        document.getElementById('btn-reset-cam').addEventListener('click', () => {
+          tweenCamera(defaultCamPos, defaultCamTarget);
+        });
       }
-      if (!isArm) mat.userData.bakedShadowsAO = leatherBake.aoMap;
 
-      mat.userData.fullPBR_normalMap = mat.normalMap;
-      mat.userData.fullPBR_aoMap     = mat.aoMap;
-      mat.userData.pendingAoMap2     = neutralAO;
-      setupNormalBlend(mat, hasUV1);
-      mat.needsUpdate = true;
-    }
+      const floorTex = await loadTexture(`/${SKU}/Floor.png`);
+      floorTex.flipY = true;
+      floorMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
+      );
+      floorMesh.rotation.x = -Math.PI / 2;
+      floorMesh.position.y = -size.y / 2;
+      scene.add(floorMesh);
+
+      rtFloor = new THREE.Mesh(
+        new THREE.PlaneGeometry(size.x * 4, size.z * 4),
+        new THREE.ShadowMaterial({ opacity: 0.35 })
+      );
+      rtFloor.rotation.x = -Math.PI / 2;
+      rtFloor.position.y = -size.y / 2;
+      rtFloor.receiveShadow = true;
+      scene.add(rtFloor);
+
+      contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
+      updateContactShadow();
+
+      await applyLeather(currentLeather);
+      await applyWood(currentWood);
+      setShadowMode(currentShadow);
+
+      loadingEl.classList.add('hidden');
+      metrics.markModelLoaded();
+      resolve();
+    }, undefined, reject);
   });
+}
 
-  buildNails(model);
-  scene.add(model);
+function setCompression(mode) {
+  currentCompression = mode;
+  const path = mode === 'None'
+    ? `/${SKU}/${SKU}-no-compression.glb`
+    : `/${SKU}/${SKU}.gltf`;
+  loadAndSetupModel(path);
+}
 
-  const size = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const defaultCamPos    = new THREE.Vector3(0, size.y * 0.5, maxDim * 1.8);
-  const defaultCamTarget = new THREE.Vector3(0, 0, 0);
-  camera.position.copy(defaultCamPos);
-  controls.target.copy(defaultCamTarget);
-  controls.update();
-
-  // Left arm, viewed from front-left — used when comparing texture resolutions
-  armCamTarget = new THREE.Vector3(-size.x * 0.38, size.y * 0.15, size.z * 0.1);
-  armCamPos    = new THREE.Vector3(-size.x * 0.5,  size.y * 0.3,  size.z * 0.55);
-
-  // Seat cushion, viewed from top-front — used when comparing fabric modes
-  seatCamTarget = new THREE.Vector3(0, size.y * 0.12, size.z * 0.15);
-  seatCamPos    = new THREE.Vector3(0, size.y * 0.65, size.z * 0.7);
-
-  document.getElementById('btn-reset-cam').addEventListener('click', () => {
-    tweenCamera(defaultCamPos, defaultCamTarget);
-  });
-
-  // Baked floor shadow (Floor.png) — used in 'Baked' mode
-  const floorTex = await loadTexture(`/${SKU}/Floor.png`);
-  floorTex.flipY = true;
-  floorMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
-  );
-  floorMesh.rotation.x = -Math.PI / 2;
-  floorMesh.position.y = -size.y / 2;
-  scene.add(floorMesh);
-
-  // Real-time shadow receiver — used in 'Real-time' and 'All' modes
-  rtFloor = new THREE.Mesh(
-    new THREE.PlaneGeometry(size.x * 4, size.z * 4),
-    new THREE.ShadowMaterial({ opacity: 0.35 })
-  );
-  rtFloor.rotation.x = -Math.PI / 2;
-  rtFloor.position.y = -size.y / 2;
-  rtFloor.receiveShadow = true;
-  scene.add(rtFloor);
-
-  // Dynamic contact shadow — used in 'Real-time + Contact' and 'Contact only' modes
-  contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
-  updateContactShadow();
-  setShadowMode('Real-time + Contact');
-
-  await applyLeather("906700-81");
-  await applyWood("HF Custom Bramble");
-
-  document.getElementById("loading").classList.add("hidden");
-  metrics.markModelLoaded();
-});
+await loadAndSetupModel(`/${SKU}/${SKU}.gltf`);
 
 // --- Resize ---
 
