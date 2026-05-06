@@ -394,6 +394,7 @@ async function applyLeather(sku) {
 
     mat.map          = tex.map;
     mat.roughnessMap = tex.roughnessMap;
+    mat.needsUpdate  = true;
 
     if (isBake) {
       // Keep mat.normalMap = baked normal (set in model load).
@@ -401,8 +402,6 @@ async function applyLeather(sku) {
       mat.userData.detailNormal = tex.normalMap;
       if (mat.userData.shader) {
         mat.userData.shader.uniforms.normalMap2.value = tex.normalMap;
-      } else {
-        mat.needsUpdate = true; // force compile so onBeforeCompile picks up detailNormal
       }
     } else {
       // Welt: no bake setup, just assign the tiling normal directly

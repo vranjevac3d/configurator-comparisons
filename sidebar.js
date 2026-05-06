@@ -97,9 +97,12 @@ export function initSidebar(onChange, defaults = {}) {
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
 
+  const WIP_IDS = new Set(['modelComplexity', 'format', 'compression', 'lod']);
+
   CATEGORIES.forEach((cat) => {
     const row = document.createElement('div');
-    row.className = 'sb-row';
+    const wip = WIP_IDS.has(cat.id);
+    row.className = 'sb-row' + (wip ? ' sb-row-wip' : '');
 
     const label = document.createElement('div');
     label.className = 'sb-row-label';
@@ -109,15 +112,24 @@ export function initSidebar(onChange, defaults = {}) {
     const opts = document.createElement('div');
     opts.className = 'sb-row-opts';
 
+    if (wip) {
+      const wipBadge = document.createElement('span');
+      wipBadge.className = 'sb-wip-badge';
+      wipBadge.textContent = 'Work in Progress';
+      opts.appendChild(wipBadge);
+    }
+
     cat.options.forEach((opt) => {
       const btn = document.createElement('button');
       btn.className = 'sb-opt' + (opt === cat.default ? ' active' : '');
       btn.textContent = opt;
-      btn.addEventListener('click', () => {
-        opts.querySelectorAll('.sb-opt').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        onChange?.(cat.id, opt);
-      });
+      if (!wip) {
+        btn.addEventListener('click', () => {
+          opts.querySelectorAll('.sb-opt').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          onChange?.(cat.id, opt);
+        });
+      }
       opts.appendChild(btn);
     });
 
