@@ -743,7 +743,7 @@ async function loadAndSetupModel(path) {
 function setCompression(mode) {
   currentCompression = mode;
   const path = mode === 'None'
-    ? `/${SKU}/${SKU}-no-compression.glb`
+    ? `/${SKU}/${SKU}-no-compression.gltf`
     : `/${SKU}/${SKU}.gltf`;
   loadAndSetupModel(path);
 }
