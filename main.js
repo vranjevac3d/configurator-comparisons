@@ -39,11 +39,13 @@ const sidebar = initSidebar(async (categoryId, option) => {
     const resMap = { "2K": "2k", "1K": "1k", "512px": "512" };
     if (resMap[option]) {
       currentRes = resMap[option];
+      if (armCamPos) tweenCamera(armCamPos, armCamTarget);
       await reloadTextures();
     }
   } else if (categoryId === "shadows") {
     setShadowMode(option);
   } else if (categoryId === "fabrics") {
+    if (seatCamPos) tweenCamera(seatCamPos, seatCamTarget);
     setFabricMode(option);
   } else if (categoryId === "envLighting") {
     setEnvLighting(option);
@@ -395,6 +397,27 @@ let currentRes = "2k";
 let currentFabric = "Full PBR";
 let currentShadow = "Real-time + Contact";
 
+// --- Camera tween ---
+
+let armCamPos    = null;
+let armCamTarget = null;
+let seatCamPos   = null;
+let seatCamTarget = null;
+
+function tweenCamera(toPos, toTarget, duration = 500) {
+  const fromPos    = camera.position.clone();
+  const fromTarget = controls.target.clone();
+  const startTime  = performance.now();
+  (function tick(now) {
+    const t    = Math.min((now - startTime) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    camera.position.lerpVectors(fromPos, toPos, ease);
+    controls.target.lerpVectors(fromTarget, toTarget, ease);
+    controls.update();
+    if (t < 1) requestAnimationFrame(tick);
+  })(performance.now());
+}
+
 // --- Contact shadow setup ---
 
 const shadowGroup = new THREE.Group();
@@ -590,19 +613,16 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
   controls.target.copy(defaultCamTarget);
   controls.update();
 
+  // Left arm, viewed from front-left — used when comparing texture resolutions
+  armCamTarget = new THREE.Vector3(-size.x * 0.38, size.y * 0.15, size.z * 0.1);
+  armCamPos    = new THREE.Vector3(-size.x * 0.5,  size.y * 0.3,  size.z * 0.55);
+
+  // Seat cushion, viewed from top-front — used when comparing fabric modes
+  seatCamTarget = new THREE.Vector3(0, size.y * 0.12, size.z * 0.15);
+  seatCamPos    = new THREE.Vector3(0, size.y * 0.65, size.z * 0.7);
+
   document.getElementById('btn-reset-cam').addEventListener('click', () => {
-    const fromPos    = camera.position.clone();
-    const fromTarget = controls.target.clone();
-    const duration   = 500;
-    const startTime  = performance.now();
-    (function tick(now) {
-      const t    = Math.min((now - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      camera.position.lerpVectors(fromPos, defaultCamPos, ease);
-      controls.target.lerpVectors(fromTarget, defaultCamTarget, ease);
-      controls.update();
-      if (t < 1) requestAnimationFrame(tick);
-    })(performance.now());
+    tweenCamera(defaultCamPos, defaultCamTarget);
   });
 
   // Baked floor shadow (Floor.png) — used in 'Baked' mode
