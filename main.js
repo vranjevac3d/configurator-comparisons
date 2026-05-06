@@ -69,7 +69,7 @@ const metrics = new MetricsTracker(renderer);
 // --- Scene ---
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xeeeff2);
+scene.background = new THREE.Color(0xf0f0f4);
 
 // --- Camera ---
 
@@ -584,9 +584,26 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
 
   const size = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
-  camera.position.set(0, size.y * 0.5, maxDim * 1.8);
-  controls.target.set(0, 0, 0);
+  const defaultCamPos    = new THREE.Vector3(0, size.y * 0.5, maxDim * 1.8);
+  const defaultCamTarget = new THREE.Vector3(0, 0, 0);
+  camera.position.copy(defaultCamPos);
+  controls.target.copy(defaultCamTarget);
   controls.update();
+
+  document.getElementById('btn-reset-cam').addEventListener('click', () => {
+    const fromPos    = camera.position.clone();
+    const fromTarget = controls.target.clone();
+    const duration   = 500;
+    const startTime  = performance.now();
+    (function tick(now) {
+      const t    = Math.min((now - startTime) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      camera.position.lerpVectors(fromPos, defaultCamPos, ease);
+      controls.target.lerpVectors(fromTarget, defaultCamTarget, ease);
+      controls.update();
+      if (t < 1) requestAnimationFrame(tick);
+    })(performance.now());
+  });
 
   // Baked floor shadow (Floor.png) — used in 'Baked' mode
   const floorTex = await loadTexture(`/${SKU}/Floor.png`);
