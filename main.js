@@ -45,6 +45,8 @@ const sidebar = initSidebar(async (categoryId, option) => {
     setShadowMode(option);
   } else if (categoryId === "fabrics") {
     setFabricMode(option);
+  } else if (categoryId === "envLighting") {
+    setEnvLighting(option);
   }
 }, { leather: "906700-81", wood: "HF Custom Bramble" });
 
@@ -104,8 +106,11 @@ scene.add(ambientLight);
 
 // --- HDR environment ---
 
+let hdrTexture = null;
+
 new RGBELoader().load("/hdr.hdr", (hdr) => {
   hdr.mapping = THREE.EquirectangularReflectionMapping;
+  hdrTexture = hdr;
   scene.environment = hdr;
   scene.environmentIntensity = 0.45;
 });
@@ -218,7 +223,8 @@ const aoBlendChunk = `
 #ifdef USE_AOMAP
 	float leatherAo = texture2D( aoMap,  vAoMapUv  ).r;
 	float shadowAo  = texture2D( aoMap2, vAoMap2Uv ).r;
-	float ambientOcclusion = ( leatherAo * shadowAo - 1.0 ) * aoMapIntensity + 1.0;
+	float leatherOcclusion = ( leatherAo - 1.0 ) * aoMapIntensity + 1.0;
+	float ambientOcclusion = leatherOcclusion * shadowAo;
 	reflectedLight.indirectDiffuse *= ambientOcclusion;
 	#if defined( USE_CLEARCOAT )
 		clearcoatSpecularIndirect *= ambientOcclusion;
@@ -359,6 +365,19 @@ function setShadowMode(mode) {
   if (rtFloor)     rtFloor.visible     = useRTFloor;
 
   setFabricMode(currentFabric);
+}
+
+// --- Env lighting mode ---
+
+function setEnvLighting(mode) {
+  if (mode === 'HDR map') {
+    scene.environment = hdrTexture;
+    scene.environmentIntensity = 0.45;
+    ambientLight.intensity = 0.0035;
+  } else if (mode === 'Flat ambient') {
+    scene.environment = null;
+    ambientLight.intensity = 1.0;
+  }
 }
 
 // --- Scene state ---
