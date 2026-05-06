@@ -98,6 +98,7 @@ export function initSidebar(onChange, defaults = {}) {
   configEl.className = 'sb-config';
 
   const WIP_IDS = new Set(['modelComplexity', 'format', 'compression', 'lod']);
+  const WIP_OPTS = new Set(['envLighting:Baked lightmaps']);
 
   CATEGORIES.forEach((cat) => {
     const row = document.createElement('div');
@@ -120,10 +121,11 @@ export function initSidebar(onChange, defaults = {}) {
     }
 
     cat.options.forEach((opt) => {
+      const wipOpt = WIP_OPTS.has(`${cat.id}:${opt}`);
       const btn = document.createElement('button');
-      btn.className = 'sb-opt' + (opt === cat.default ? ' active' : '');
+      btn.className = 'sb-opt' + (opt === cat.default ? ' active' : '') + (wipOpt ? ' sb-opt-wip' : '');
       btn.textContent = opt;
-      if (!wip) {
+      if (!wip && !wipOpt) {
         btn.addEventListener('click', () => {
           opts.querySelectorAll('.sb-opt').forEach((b) => b.classList.remove('active'));
           btn.classList.add('active');

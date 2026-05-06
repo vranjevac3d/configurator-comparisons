@@ -158,6 +158,12 @@ body {
 .sb-row-wip:hover .sb-wip-badge { display: flex; }
 .sb-row-wip:hover .sb-opt       { opacity: 0.1; }
 
+.sb-opt-wip {
+  opacity: 0.3;
+  pointer-events: none;
+  cursor: default;
+}
+
 /* ── Leather swatches ─────────────────────────────────── */
 
 .sb-swatches {

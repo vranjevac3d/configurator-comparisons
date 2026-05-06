@@ -210,11 +210,15 @@ const leatherBake = {
 
 // --- Normal-blend shader (baked large-scale + tiling detail, like pwa) ---
 
+// Neutral 1×1 white texture — used as aoMap2 when baked shadows are not active
+const neutralAO = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+neutralAO.needsUpdate = true;
+
 const aoBlendChunk = `
 #ifdef USE_AOMAP
-	float bakedAo  = texture2D( aoMap,  vAoMapUv         ).r;
-	float detailAo = texture2D( aoMap2, vAoMapUv         ).r;
-	float ambientOcclusion = ( mix( detailAo, bakedAo, 0.5 ) - 1.0 ) * aoMapIntensity + 1.0;
+	float leatherAo = texture2D( aoMap,  vAoMapUv  ).r;
+	float shadowAo  = texture2D( aoMap2, vAoMap2Uv ).r;
+	float ambientOcclusion = ( leatherAo * shadowAo - 1.0 ) * aoMapIntensity + 1.0;
 	reflectedLight.indirectDiffuse *= ambientOcclusion;
 	#if defined( USE_CLEARCOAT )
 		clearcoatSpecularIndirect *= ambientOcclusion;
@@ -255,20 +259,19 @@ const normalBlendChunk = `
 #endif
 `;
 
-function setupNormalBlend(mat) {
+function setupNormalBlend(mat, useUV1ForAO2 = false) {
   mat.onBeforeCompile = (shader) => {
     mat.userData.shader = shader;
     shader.uniforms.normalMap2 = { value: mat.userData.detailNormal || leatherBake.normalMap };
-    shader.uniforms.aoMap2     = { value: mat.userData.detailAO     || leatherBake.leatherAO };
+    shader.uniforms.aoMap2     = { value: mat.userData.pendingAoMap2 || neutralAO };
 
-    // Inject a UV0×10 varying that's always available (vMapUv only exists when USE_MAP is active)
     shader.vertexShader = shader.vertexShader.replace(
       '#include <uv_pars_vertex>',
-      '#include <uv_pars_vertex>\nvarying vec2 vLeatherDetailUv;'
+      '#include <uv_pars_vertex>\nvarying vec2 vLeatherDetailUv;\nvarying vec2 vAoMap2Uv;'
     );
     shader.vertexShader = shader.vertexShader.replace(
       '#include <uv_vertex>',
-      '#include <uv_vertex>\nvLeatherDetailUv = uv * 10.0;'
+      `#include <uv_vertex>\nvLeatherDetailUv = uv * 10.0;\nvAoMap2Uv = ${useUV1ForAO2 ? 'uv1' : 'uv'};`
     );
 
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -277,7 +280,7 @@ function setupNormalBlend(mat) {
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <aomap_pars_fragment>',
-      '#include <aomap_pars_fragment>\nuniform sampler2D aoMap2;'
+      '#include <aomap_pars_fragment>\nuniform sampler2D aoMap2;\nvarying vec2 vAoMap2Uv;'
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
@@ -296,6 +299,7 @@ function setFabricMode(mode) {
   currentFabric = mode;
   if (!loadedModel) return;
 
+  const bakedShadow   = ['Baked', 'All'].includes(currentShadow);
   const showNormal    = mode === 'Full PBR' || mode === 'Normal Map';
   const showRoughness = mode === 'Full PBR';
   const showAO        = mode === 'Full PBR' || mode === 'AO Map';
@@ -313,7 +317,12 @@ function setFabricMode(mode) {
     mat.normalMap    = showNormal    ? mat.userData.fullPBR_normalMap    ?? mat.normalMap    : null;
     mat.roughnessMap = showRoughness ? mat.userData.fullPBR_roughnessMap ?? mat.roughnessMap : null;
     if (isBake) {
-      mat.aoMap = showAO ? mat.userData.fullPBR_aoMap ?? mat.aoMap : null;
+      mat.aoMap = showAO ? (mat.userData.fullPBR_aoMap ?? mat.aoMap) : null;
+      const ao2 = showAO && bakedShadow && mat.userData.bakedShadowsAO
+        ? mat.userData.bakedShadowsAO
+        : neutralAO;
+      mat.userData.pendingAoMap2 = ao2;
+      if (mat.userData.shader) mat.userData.shader.uniforms.aoMap2.value = ao2;
     }
     mat.needsUpdate = true;
   });
@@ -322,6 +331,7 @@ function setFabricMode(mode) {
 // --- Shadow mode ---
 
 function setShadowMode(mode) {
+  currentShadow = mode;
   // real-time:         RT on model + floor,  no contact,  no baked floor
   // real-time+contact: RT on model,           contact,     no baked floor
   // baked:             no RT,                 no contact,  baked floor
@@ -342,6 +352,8 @@ function setShadowMode(mode) {
   if (shadowGroup) shadowGroup.visible = useContact;
   if (floorMesh)   floorMesh.visible   = useBaked;
   if (rtFloor)     rtFloor.visible     = useRTFloor;
+
+  setFabricMode(currentFabric);
 }
 
 // --- Scene state ---
@@ -357,6 +369,7 @@ let currentWood = "HF Custom Natural";
 let currentTexExt = "jpg";
 let currentRes = "2k";
 let currentFabric = "Full PBR";
+let currentShadow = "Real-time + Contact";
 
 // --- Contact shadow setup ---
 
@@ -523,22 +536,21 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
 
       const isArm = mat.name === 'arm' || mat.name.startsWith('arm_');
 
-      // Clone per-material so channel assignments don't cross-contaminate the shared texture
-      const aoSource = isArm ? leatherBake.leatherAO : leatherBake.aoMap;
-
       if (hasUV1) {
         const n = leatherBake.normalMap.clone(); n.channel = 1;
-        const a = aoSource.clone();              a.channel = 1;
         mat.normalMap = n;
-        mat.aoMap     = a;
+        const ao = leatherBake.leatherAO.clone(); ao.channel = 1;
+        mat.aoMap = ao;
       } else {
         mat.normalMap = leatherBake.normalMap;
-        mat.aoMap     = aoSource;
+        mat.aoMap = leatherBake.leatherAO;
       }
+      if (!isArm) mat.userData.bakedShadowsAO = leatherBake.aoMap;
 
       mat.userData.fullPBR_normalMap = mat.normalMap;
       mat.userData.fullPBR_aoMap     = mat.aoMap;
-      setupNormalBlend(mat);
+      mat.userData.pendingAoMap2     = neutralAO;
+      setupNormalBlend(mat, hasUV1);
       mat.needsUpdate = true;
     }
   });
