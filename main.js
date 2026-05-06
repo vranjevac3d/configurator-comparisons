@@ -49,6 +49,8 @@ const sidebar = initSidebar(async (categoryId, option) => {
     setFabricMode(option);
   } else if (categoryId === "envLighting") {
     setEnvLighting(option);
+  } else if (categoryId === "mipmaps") {
+    setMipmaps(option);
   }
 }, { leather: "906700-81", wood: "HF Custom Bramble" });
 
@@ -380,6 +382,34 @@ function setEnvLighting(mode) {
     scene.environment = null;
     ambientLight.intensity = 1.0;
   }
+}
+
+// --- Mipmaps ---
+
+function setMipmaps(mode) {
+  const on = mode === 'On';
+  const minFilter = on ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+
+  const seen = new Set();
+  function applyTo(tex) {
+    if (!tex || seen.has(tex)) return;
+    seen.add(tex);
+    tex.generateMipmaps = on;
+    tex.minFilter = minFilter;
+    tex.needsUpdate = true;
+  }
+
+  if (loadedModel) {
+    loadedModel.traverse(node => {
+      if (!node.isMesh || !node.material) return;
+      const mat = node.material;
+      ['map', 'normalMap', 'roughnessMap', 'aoMap', 'emissiveMap', 'metalnessMap'].forEach(k => applyTo(mat[k]));
+    });
+  }
+
+  [leatherBake.normalMap, leatherBake.aoMap, leatherBake.leatherAO].forEach(applyTo);
+  Object.values(leatherTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
+  Object.values(woodTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
 }
 
 // --- Scene state ---
