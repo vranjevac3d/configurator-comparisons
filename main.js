@@ -618,6 +618,19 @@ dracoLoader.setDecoderPath("/draco/");
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
 
+const modelCache = {};
+
+function cloneScene(source) {
+  const clone = source.clone(true);
+  clone.traverse(node => {
+    if (!node.isMesh || !node.material) return;
+    node.material = Array.isArray(node.material)
+      ? node.material.map(m => m.clone())
+      : node.material.clone();
+  });
+  return clone;
+}
+
 async function loadAndSetupModel(path) {
   loadingEl.classList.remove('hidden');
   metrics.reset();
@@ -640,104 +653,105 @@ async function loadAndSetupModel(path) {
     shadowGroup.remove(c);
   }
 
-  return new Promise((resolve, reject) => {
-    gltfLoader.load(path, async (gltf) => {
-      metrics.markLoadEnd();
+  if (!modelCache[path]) {
+    modelCache[path] = await new Promise((resolve, reject) =>
+      gltfLoader.load(path, resolve, undefined, reject)
+    );
+  }
 
-      const model = gltf.scene;
-      loadedModel  = model;
-      player.model = model;
+  metrics.markLoadEnd();
 
-      const box    = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.sub(center);
+  const model = cloneScene(modelCache[path].scene);
+  loadedModel  = model;
+  player.model = model;
 
-      model.traverse((node) => {
-        if (!node.isMesh) return;
-        node.castShadow    = true;
-        node.receiveShadow = true;
+  const box    = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.sub(center);
 
-        const mat = node.material;
-        if (!mat) return;
+  model.traverse((node) => {
+    if (!node.isMesh) return;
+    node.castShadow    = true;
+    node.receiveShadow = true;
 
-        if (materialWithBake(mat.name)) {
-          const isFallback = materialFallbacksOnMain(mat.name);
-          const hasUV1     = isFallback && !!node.geometry.attributes.uv1;
-          const isArm      = mat.name === 'arm' || mat.name.startsWith('arm_');
+    const mat = node.material;
+    if (!mat) return;
 
-          if (hasUV1) {
-            const n = leatherBake.normalMap.clone(); n.channel = 1;
-            mat.normalMap = n;
-            const ao = leatherBake.leatherAO.clone(); ao.channel = 1;
-            mat.aoMap = ao;
-          } else {
-            mat.normalMap = leatherBake.normalMap;
-            mat.aoMap     = leatherBake.leatherAO;
-          }
-          if (!isArm) mat.userData.bakedShadowsAO = leatherBake.aoMap;
+    if (materialWithBake(mat.name)) {
+      const isFallback = materialFallbacksOnMain(mat.name);
+      const hasUV1     = isFallback && !!node.geometry.attributes.uv1;
+      const isArm      = mat.name === 'arm' || mat.name.startsWith('arm_');
 
-          mat.userData.fullPBR_normalMap = mat.normalMap;
-          mat.userData.fullPBR_aoMap     = mat.aoMap;
-          mat.userData.pendingAoMap2     = neutralAO;
-          setupNormalBlend(mat, hasUV1);
-          mat.needsUpdate = true;
-        }
-      });
-
-      buildNails(model);
-      scene.add(model);
-
-      const size   = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-
-      if (!armCamPos) {
-        const defaultCamPos    = new THREE.Vector3(0, size.y * 0.5, maxDim * 1.8);
-        const defaultCamTarget = new THREE.Vector3(0, 0, 0);
-        camera.position.copy(defaultCamPos);
-        controls.target.copy(defaultCamTarget);
-        controls.update();
-
-        armCamTarget  = new THREE.Vector3(-size.x * 0.38, size.y * 0.15, size.z * 0.1);
-        armCamPos     = new THREE.Vector3(-size.x * 0.5,  size.y * 0.3,  size.z * 0.55);
-        seatCamTarget = new THREE.Vector3(0, size.y * 0.12, size.z * 0.15);
-        seatCamPos    = new THREE.Vector3(0, size.y * 0.65, size.z * 0.7);
-
-        document.getElementById('btn-reset-cam').addEventListener('click', () => {
-          tweenCamera(defaultCamPos, defaultCamTarget);
-        });
+      if (hasUV1) {
+        const n = leatherBake.normalMap.clone(); n.channel = 1;
+        mat.normalMap = n;
+        const ao = leatherBake.leatherAO.clone(); ao.channel = 1;
+        mat.aoMap = ao;
+      } else {
+        mat.normalMap = leatherBake.normalMap;
+        mat.aoMap     = leatherBake.leatherAO;
       }
+      if (!isArm) mat.userData.bakedShadowsAO = leatherBake.aoMap;
 
-      const floorTex = await loadTexture(`/${SKU}/Floor.png`);
-      floorTex.flipY = true;
-      floorMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(2, 2),
-        new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
-      );
-      floorMesh.rotation.x = -Math.PI / 2;
-      floorMesh.position.y = -size.y / 2;
-      scene.add(floorMesh);
-
-      rtFloor = new THREE.Mesh(
-        new THREE.PlaneGeometry(size.x * 4, size.z * 4),
-        new THREE.ShadowMaterial({ opacity: 0.35 })
-      );
-      rtFloor.rotation.x = -Math.PI / 2;
-      rtFloor.position.y = -size.y / 2;
-      rtFloor.receiveShadow = true;
-      scene.add(rtFloor);
-
-      contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
-      updateContactShadow();
-
-      await applyLeather(currentLeather);
-      await applyWood(currentWood);
-      setShadowMode(currentShadow);
-
-      loadingEl.classList.add('hidden');
-      metrics.markModelLoaded();
-      resolve();
-    }, undefined, reject);
+      mat.userData.fullPBR_normalMap = mat.normalMap;
+      mat.userData.fullPBR_aoMap     = mat.aoMap;
+      mat.userData.pendingAoMap2     = neutralAO;
+      setupNormalBlend(mat, hasUV1);
+      mat.needsUpdate = true;
+    }
   });
+
+  buildNails(model);
+  scene.add(model);
+
+  const size   = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+
+  if (!armCamPos) {
+    const defaultCamPos    = new THREE.Vector3(0, size.y * 0.5, maxDim * 1.8);
+    const defaultCamTarget = new THREE.Vector3(0, 0, 0);
+    camera.position.copy(defaultCamPos);
+    controls.target.copy(defaultCamTarget);
+    controls.update();
+
+    armCamTarget  = new THREE.Vector3(-size.x * 0.38, size.y * 0.15, size.z * 0.1);
+    armCamPos     = new THREE.Vector3(-size.x * 0.5,  size.y * 0.3,  size.z * 0.55);
+    seatCamTarget = new THREE.Vector3(0, size.y * 0.12, size.z * 0.15);
+    seatCamPos    = new THREE.Vector3(0, size.y * 0.65, size.z * 0.7);
+
+    document.getElementById('btn-reset-cam').addEventListener('click', () => {
+      tweenCamera(defaultCamPos, defaultCamTarget);
+    });
+  }
+
+  const floorTex = await loadTexture(`/${SKU}/Floor.png`);
+  floorTex.flipY = true;
+  floorMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
+  );
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.position.y = -size.y / 2;
+  scene.add(floorMesh);
+
+  rtFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(size.x * 4, size.z * 4),
+    new THREE.ShadowMaterial({ opacity: 0.35 })
+  );
+  rtFloor.rotation.x = -Math.PI / 2;
+  rtFloor.position.y = -size.y / 2;
+  rtFloor.receiveShadow = true;
+  scene.add(rtFloor);
+
+  contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
+  updateContactShadow();
+
+  await applyLeather(currentLeather);
+  await applyWood(currentWood);
+  setShadowMode(currentShadow);
+
+  loadingEl.classList.add('hidden');
+  metrics.markModelLoaded();
 }
 
 function setCompression(mode) {
