@@ -87,14 +87,15 @@ export function initSidebar(onChange, defaults = {}) {
   header.textContent = 'Configurator Compare';
   sidebar.appendChild(header);
 
+  // Config tab header
+  const configHeader = document.createElement('div');
+  configHeader.className = 'sb-tab-header';
+  configHeader.innerHTML = '<span class="sb-tab-arrow">▾</span><span>Config</span>';
+  sidebar.appendChild(configHeader);
+
   // Config scroll area
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
-
-  const configLabel = document.createElement('div');
-  configLabel.className = 'sb-section-label';
-  configLabel.textContent = 'Config';
-  configEl.appendChild(configLabel);
 
   CATEGORIES.forEach((cat) => {
     const row = document.createElement('div');
@@ -206,18 +207,28 @@ export function initSidebar(onChange, defaults = {}) {
 
   sidebar.appendChild(configEl);
 
+  // Metrics tab header
+  const metricsHeader = document.createElement('div');
+  metricsHeader.className = 'sb-tab-header';
+  metricsHeader.innerHTML = '<span class="sb-tab-arrow">▾</span><span>Metrics</span>';
+  sidebar.appendChild(metricsHeader);
+
   // Metrics section
   const metricsEl = document.createElement('div');
   metricsEl.className = 'sb-metrics';
 
-  const metricsLabel = document.createElement('div');
-  metricsLabel.className = 'sb-section-label';
-  metricsLabel.textContent = 'Metrics';
-  metricsEl.appendChild(metricsLabel);
-
   const grid = document.createElement('div');
   grid.className = 'sb-metrics-grid';
   metricsEl.appendChild(grid);
+
+  const resLabel = document.createElement('div');
+  resLabel.className = 'sb-section-label';
+  resLabel.textContent = 'Resources';
+  metricsEl.appendChild(resLabel);
+
+  const resTable = document.createElement('div');
+  resTable.className = 'sb-resources';
+  metricsEl.appendChild(resTable);
 
   sidebar.appendChild(metricsEl);
 
@@ -235,6 +246,110 @@ export function initSidebar(onChange, defaults = {}) {
     </div>`;
   }
 
+  function fmtKB(kb) {
+    return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb.toFixed(0)} KB`;
+  }
+
+  function fmtMs(ms) {
+    return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms} ms`;
+  }
+
+  const groupOpen = { models: true, images: true };
+
+  resTable.addEventListener('click', (e) => {
+    const link = e.target.closest('.res-link');
+    if (link) {
+      window.open(link.dataset.url, '_blank');
+      return;
+    }
+    const hd = e.target.closest('.res-group-hd');
+    if (!hd) return;
+    const id = hd.dataset.group;
+    groupOpen[id] = !groupOpen[id];
+    hd.querySelector('.res-arrow').textContent = groupOpen[id] ? '▾' : '▸';
+    resTable.querySelector(`[data-body="${id}"]`).style.display = groupOpen[id] ? '' : 'none';
+  });
+
+  function toggleSection(header, body) {
+    const arrow = header.querySelector('.sb-tab-arrow');
+    const open = body.style.display === 'none';
+    body.style.display = open ? '' : 'none';
+    arrow.textContent = open ? '▾' : '▸';
+  }
+
+  configHeader.addEventListener('click', () => toggleSection(configHeader, configEl));
+
+  // Metrics header: drag up/down to resize, click to collapse/expand
+  metricsHeader.style.cursor = 'ns-resize';
+
+  let _dragY, _dragH, _dragging;
+
+  metricsHeader.addEventListener('mousedown', (e) => {
+    _dragY    = e.clientY;
+    _dragH    = metricsEl.style.display === 'none' ? 0 : metricsEl.offsetHeight;
+    _dragging = false;
+
+    const onMove = (ev) => {
+      const dy = _dragY - ev.clientY;
+      if (!_dragging && Math.abs(dy) > 3) _dragging = true;
+      if (!_dragging) return;
+
+      const max = sidebar.offsetHeight - 60;
+      const h   = Math.max(0, Math.min(max, _dragH + dy));
+
+      if (h > 0) {
+        metricsEl.style.display  = '';
+        metricsEl.style.height   = h + 'px';
+        metricsEl.style.overflow = 'hidden';
+        metricsHeader.querySelector('.sb-tab-arrow').textContent = '▾';
+      } else {
+        metricsEl.style.display = 'none';
+        metricsEl.style.height  = '';
+        metricsHeader.querySelector('.sb-tab-arrow').textContent = '▸';
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      if (!_dragging) toggleSection(metricsHeader, metricsEl);
+      _dragging = false;
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  function renderGroup(id, label, items) {
+    if (!items.length) return '';
+    const totalKB = items.reduce((sum, r) => sum + r.kb, 0);
+    const open = groupOpen[id];
+    const itemsHTML = items.map(r => {
+      const nameEl = r.isModel
+        ? `<span class="res-name" title="${r.name}">${r.name}</span>`
+        : `<a class="res-name res-link" data-url="${r.url}" title="${r.name}">${r.name}</a>`;
+      return `
+      <div class="res-row">
+        ${nameEl}
+        <span class="res-size">${r.cached ? 'cached' : fmtKB(r.kb)}</span>
+        <span class="res-time">${fmtMs(r.ms)}</span>
+      </div>`;
+    }).join('');
+    return `
+      <div class="res-group-hd" data-group="${id}">
+        <span class="res-arrow">${open ? '▾' : '▸'}</span>
+        <span class="res-group-label">${label}</span>
+        <span class="res-group-count">${items.length}</span>
+        <span class="res-group-size">${fmtKB(totalKB)}</span>
+      </div>
+      <div class="res-group-body" data-body="${id}"${open ? '' : ' style="display:none"'}>
+        ${itemsHTML}
+      </div>`;
+  }
+
   return {
     updateMetrics(s) {
       grid.innerHTML =
@@ -249,6 +364,20 @@ export function initSidebar(onChange, defaults = {}) {
         row('Triangles',  s.triangles) +
         row('Textures',   s.textures) +
         row('Geometries', s.geometries);
+
+      const models = s.resources.filter(r => r.isModel);
+      const images = s.resources.filter(r => !r.isModel);
+      const totalKB = s.resources.reduce((sum, r) => sum + r.kb, 0);
+      const totalMs = s.resources.reduce((sum, r) => sum + r.ms, 0);
+
+      resTable.innerHTML = `
+        <div class="res-summary">
+          <span class="res-summary-label">Total</span>
+          <span class="res-summary-size">${fmtKB(totalKB)}</span>
+          <span class="res-summary-time">${fmtMs(totalMs)}</span>
+        </div>
+        ${renderGroup('models', 'Models', models)}
+        ${renderGroup('images', 'Images', images)}`;
     },
   };
 }

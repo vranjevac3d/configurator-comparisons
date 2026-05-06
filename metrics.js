@@ -85,10 +85,24 @@ export class MetricsTracker {
   get geometries() { return this.renderer.info.memory.geometries; }
   get textures()   { return this.renderer.info.memory.textures; }
 
+  get resources() {
+    return performance.getEntriesByType('resource')
+      .filter(e => /\.(gltf|glb|bin|jpg|jpeg|webp|ktx2|avif|png)(\?|$)/i.test(e.name))
+      .sort((a, b) => b.duration - a.duration)
+      .map(e => ({
+        name:    e.name.split('/').pop().split('?')[0],
+        url:     e.name,
+        kb:      (e.transferSize || e.encodedBodySize) / 1024,
+        ms:      Math.round(e.duration),
+        cached:  e.transferSize === 0 && e.encodedBodySize > 0,
+        isModel: /\.(gltf|glb|bin)/i.test(e.name),
+      }));
+  }
+
   snapshot() {
     const fmt = (n, dec = 1) => n !== null ? n.toFixed(dec) : '—';
-    const ms  = (n) => n !== null ? `${n.toFixed(0)} ms` : '—';
-    const mb  = (n) => n !== null ? `${n.toFixed(1)} MB` : '—';
+    const ms  = (n) => n === null ? '—' : n >= 1000 ? `${(n / 1000).toFixed(2)} s` : `${n.toFixed(0)} ms`;
+    const mb  = (n) => n === null ? '—' : n >= 1 ? `${n.toFixed(1)} MB` : `${(n * 1024).toFixed(0)} KB`;
 
     return {
       avgFPS:     fmt(this.avgFPS),
@@ -102,6 +116,7 @@ export class MetricsTracker {
       triangles:  this.triangles.toLocaleString(),
       textures:   this.textures,
       geometries: this.geometries,
+      resources:  this.resources,
     };
   }
 }

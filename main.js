@@ -202,10 +202,26 @@ const SKU = "641-25";
 
 const leatherBake = {
   normalMap: await loadTexture(`/${SKU}/${SKU}_LEATHER_Normal.jpg`),
-  aoMap:     await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`),
+  aoMap:     await loadTexture(`/${SKU}/Baked_Shadows.png`),
+  leatherAO: await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`),
 };
 
 // --- Normal-blend shader (baked large-scale + tiling detail, like pwa) ---
+
+const aoBlendChunk = `
+#ifdef USE_AOMAP
+	float bakedAo  = texture2D( aoMap,  vAoMapUv         ).r;
+	float detailAo = texture2D( aoMap2, vAoMapUv         ).r;
+	float ambientOcclusion = ( mix( detailAo, bakedAo, 0.5 ) - 1.0 ) * aoMapIntensity + 1.0;
+	reflectedLight.indirectDiffuse *= ambientOcclusion;
+	#if defined( USE_CLEARCOAT )
+		clearcoatSpecularIndirect *= ambientOcclusion;
+	#endif
+	#if defined( USE_SHEEN )
+		sheenSpecularIndirect *= ambientOcclusion;
+	#endif
+#endif
+`;
 
 const normalBlendChunk = `
 #ifdef USE_NORMALMAP_OBJECTSPACE
@@ -241,6 +257,7 @@ function setupNormalBlend(mat) {
   mat.onBeforeCompile = (shader) => {
     mat.userData.shader = shader;
     shader.uniforms.normalMap2 = { value: mat.userData.detailNormal || leatherBake.normalMap };
+    shader.uniforms.aoMap2     = { value: mat.userData.detailAO     || leatherBake.leatherAO };
 
     // Inject a UV0×10 varying that's always available (vMapUv only exists when USE_MAP is active)
     shader.vertexShader = shader.vertexShader.replace(
@@ -257,8 +274,16 @@ function setupNormalBlend(mat) {
       '#include <normalmap_pars_fragment>\nuniform sampler2D normalMap2;\nvarying vec2 vLeatherDetailUv;'
     );
     shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <aomap_pars_fragment>',
+      '#include <aomap_pars_fragment>\nuniform sampler2D aoMap2;'
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
       normalBlendChunk
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <aomap_fragment>',
+      aoBlendChunk
     );
   };
 }
@@ -449,15 +474,19 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
       const isFallback = materialFallbacksOnMain(mat.name);
       const hasUV1 = isFallback && !!node.geometry.attributes.uv1;
 
+      const isArm = mat.name === 'arm' || mat.name.startsWith('arm_');
+
       // Clone per-material so channel assignments don't cross-contaminate the shared texture
+      const aoSource = isArm ? leatherBake.leatherAO : leatherBake.aoMap;
+
       if (hasUV1) {
         const n = leatherBake.normalMap.clone(); n.channel = 1;
-        const a = leatherBake.aoMap.clone();     a.channel = 1;
+        const a = aoSource.clone();              a.channel = 1;
         mat.normalMap = n;
         mat.aoMap     = a;
       } else {
         mat.normalMap = leatherBake.normalMap;
-        mat.aoMap     = leatherBake.aoMap;
+        mat.aoMap     = aoSource;
       }
 
       setupNormalBlend(mat);

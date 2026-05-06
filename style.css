@@ -40,15 +40,43 @@ body {
   user-select: none;
 }
 
+
 .sb-header {
   padding: 13px 14px 11px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--c-muted);
-  border-bottom: 1px solid var(--c-border);
   flex-shrink: 0;
+}
+
+.sb-tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-text);
+  background: var(--c-surface2);
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  transition: background 80ms;
+}
+
+.sb-tab-header:hover { background: var(--c-tag-hover); }
+
+.sb-tab-arrow {
+  font-size: 10px;
+  color: var(--c-muted);
+  width: 10px;
+  text-align: center;
 }
 
 /* Config scroll area */
@@ -63,15 +91,6 @@ body {
 .sb-config::-webkit-scrollbar-track { background: transparent; }
 .sb-config::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 2px; }
 
-.sb-section-label {
-  padding: 8px 14px 3px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--c-muted);
-}
-
 .sb-row {
   padding: 4px 14px 6px;
 }
@@ -81,7 +100,7 @@ body {
 }
 
 .sb-row-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--c-muted);
   margin-bottom: 5px;
   letter-spacing: 0.02em;
@@ -99,7 +118,7 @@ body {
   border-radius: 3px;
   color: var(--c-text);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-family: inherit;
   padding: 2px 7px 3px;
   line-height: 1.4;
@@ -155,7 +174,6 @@ body {
   border-top: 1px solid var(--c-border);
   padding: 6px 0 10px;
   flex-shrink: 0;
-  background: var(--c-bg);
 }
 
 .sb-metrics-grid {
@@ -173,18 +191,144 @@ body {
 
 .m-label {
   color: var(--c-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .m-val {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--c-text);
 }
 
 .m-val.good  { color: #66dd88; }
 .m-val.warn  { color: #ddaa44; }
 .m-val.bad   { color: #ee6655; }
+
+/* ── Resources table ──────────────────────────────────── */
+
+.sb-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  padding: 6px 14px 2px;
+}
+
+.sb-resources {
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 14px 4px;
+}
+
+.sb-resources::-webkit-scrollbar { width: 4px; }
+.sb-resources::-webkit-scrollbar-track { background: transparent; }
+.sb-resources::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 2px; }
+
+.res-summary {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0 5px;
+}
+
+.res-summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.res-summary-size,
+.res-summary-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--c-text);
+  white-space: nowrap;
+}
+
+.res-group-hd {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  gap: 4px;
+  align-items: baseline;
+  padding: 3px 0;
+  border-top: 1px solid var(--c-border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.res-group-hd:hover .res-group-label { color: var(--c-text); }
+
+.res-arrow {
+  font-size: 9px;
+  color: var(--c-muted);
+}
+
+.res-group-label {
+  font-size: 11px;
+  color: var(--c-muted);
+}
+
+.res-group-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--c-muted);
+}
+
+.res-group-size {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--c-muted);
+  white-space: nowrap;
+}
+
+.res-group-body {
+  padding-left: 12px;
+}
+
+.res-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 0;
+  border-top: 1px solid #1c1c28;
+}
+
+.res-row:first-child { border-top: none; }
+
+.res-name {
+  font-size: 11px;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.res-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.res-link:hover {
+  color: var(--c-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.res-size,
+.res-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--c-muted);
+  white-space: nowrap;
+}
+
+.res-time { color: var(--c-text); }
 
 /* ── Loading overlay ──────────────────────────────────── */
 
