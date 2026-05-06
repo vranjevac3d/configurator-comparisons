@@ -33,11 +33,15 @@ const CATEGORIES = [
   },
   {
     id: 'modelShadows', label: 'Model Shadows',
-    options: ['Real-time', 'Baked', 'None'], default: 'Real-time',
+    options: ['Real-time', 'None'], default: 'Real-time',
   },
   {
     id: 'floorShadows', label: 'Floor Shadows',
     options: ['Contact', 'Real-time', 'Baked', 'None'], default: 'Contact',
+  },
+  {
+    id: 'gtao', label: 'GTAO',
+    options: ['Off', 'On'], default: 'Off',
   },
   {
     id: 'renderer', label: 'Renderer',

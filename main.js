@@ -4,6 +4,10 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { contactShadow, blurShadow } from "./contactShadow.js";
 import { buildNails } from "./nails.js";
 import { initSidebar } from "./sidebar.js";
@@ -57,6 +61,8 @@ const sidebar = initSidebar(async (categoryId, option) => {
     setMipmaps(option);
   } else if (categoryId === "anisotropy") {
     setAnisotropy(option);
+  } else if (categoryId === "gtao") {
+    setGTAO(option);
   }
 }, { leather: "906700-81", wood: "HF Custom Bramble" });
 
@@ -85,6 +91,24 @@ scene.background = new THREE.Color(0xf0f0f4);
 
 const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
 camera.position.set(0, 2, 5);
+
+// --- Post-processing ---
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const gtaoPass = new GTAOPass(scene, camera, 1, 1);
+gtaoPass.output = GTAOPass.OUTPUT.Default;
+gtaoPass.blendIntensity = 1.0;
+gtaoPass.radius = 0.3;
+gtaoPass.distanceExponent = 2;
+gtaoPass.thickness = 1;
+gtaoPass.scale = 1;
+gtaoPass.samples = 16;
+gtaoPass.enabled = false;
+composer.addPass(gtaoPass);
+
+composer.addPass(new OutputPass());
 
 // --- Controls ---
 
@@ -387,6 +411,10 @@ function setModelShadow(mode) {
 function setFloorShadow(mode) {
   currentFloorShadow = mode;
   applyAllShadows();
+}
+
+function setGTAO(mode) {
+  gtaoPass.enabled = (mode === 'On');
 }
 
 // --- Env lighting mode ---
@@ -787,6 +815,8 @@ function onResize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
+  composer.setSize(w, h);
+  gtaoPass.setSize(w, h);
 }
 
 new ResizeObserver(onResize).observe(viewport);
@@ -800,7 +830,7 @@ function animate() {
   requestAnimationFrame(animate);
   metrics.tick();
   controls.update();
-  renderer.render(scene, camera);
+  composer.render();
 
   // Update metrics display every 30 frames
   if (++frame % 30 === 0) {
