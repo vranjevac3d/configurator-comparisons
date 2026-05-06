@@ -32,8 +32,12 @@ const CATEGORIES = [
     options: ['HDR map', 'Flat ambient', 'Baked lightmaps'], default: 'HDR map',
   },
   {
-    id: 'shadows', label: 'Shadows',
-    options: ['Real-time', 'Real-time + Contact', 'Baked', 'Contact only', 'All', 'None'], default: 'Real-time + Contact',
+    id: 'modelShadows', label: 'Model Shadows',
+    options: ['Real-time', 'Baked', 'None'], default: 'Real-time',
+  },
+  {
+    id: 'floorShadows', label: 'Floor Shadows',
+    options: ['Real-time', 'Baked', 'None'], default: 'Real-time',
   },
   {
     id: 'renderer', label: 'Renderer',

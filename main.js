@@ -42,8 +42,10 @@ const sidebar = initSidebar(async (categoryId, option) => {
       if (armCamPos) tweenCamera(armCamPos, armCamTarget);
       await reloadTextures();
     }
-  } else if (categoryId === "shadows") {
-    setShadowMode(option);
+  } else if (categoryId === "modelShadows") {
+    setModelShadow(option);
+  } else if (categoryId === "floorShadows") {
+    setFloorShadow(option);
   } else if (categoryId === "fabrics") {
     if (seatCamPos) tweenCamera(seatCamPos, seatCamTarget);
     setFabricMode(option);
@@ -316,7 +318,7 @@ function setFabricMode(mode) {
   currentFabric = mode;
   if (!loadedModel) return;
 
-  const bakedShadow   = ['Baked', 'All'].includes(currentShadow);
+  const bakedShadow   = currentModelShadow === 'Baked';
   const showNormal    = mode === 'Full PBR' || mode === 'Normal Map';
   const showRoughness = mode === 'Full PBR';
   const showAO        = mode === 'Full PBR' || mode === 'AO Map';
@@ -347,32 +349,35 @@ function setFabricMode(mode) {
   });
 }
 
-// --- Shadow mode ---
+// --- Shadow modes ---
 
-function setShadowMode(mode) {
-  currentShadow = mode;
-  // real-time:         RT on model + floor,  no contact,  no baked floor
-  // real-time+contact: RT on model,           contact,     no baked floor
-  // baked:             no RT,                 no contact,  baked floor
-  // contact only:      no RT,                 contact,     no baked floor
-  // all:               RT on model,   no contact,  baked floor
-  // none:              nothing
-  const useRealtime = ['Real-time', 'Real-time + Contact', 'All'].includes(mode);
-  const useContact  = ['Real-time + Contact', 'Contact only'].includes(mode);
-  const useBaked    = ['Baked', 'All'].includes(mode);
-  const useRTFloor  = mode === 'Real-time';
+function applyAllShadows() {
+  const modelRT    = currentModelShadow === 'Real-time';
+  const floorRT    = currentFloorShadow === 'Real-time';
+  const floorBaked = currentFloorShadow === 'Baked';
 
-  renderer.shadowMap.enabled = useRealtime;
-  shadowLight.castShadow = useRealtime;
+  renderer.shadowMap.enabled = modelRT;
+  shadowLight.castShadow     = modelRT;
+
   if (loadedModel) loadedModel.traverse(n => {
-    if (n.isMesh) { n.castShadow = useRealtime; n.receiveShadow = useRealtime; }
+    if (n.isMesh) { n.castShadow = modelRT; n.receiveShadow = modelRT; }
   });
 
-  if (shadowGroup) shadowGroup.visible = useContact;
-  if (floorMesh)   floorMesh.visible   = useBaked;
-  if (rtFloor)     rtFloor.visible     = useRTFloor;
+  if (shadowGroup) shadowGroup.visible = floorRT;
+  if (floorMesh)   floorMesh.visible   = floorBaked;
+  if (rtFloor)     rtFloor.visible     = false;
 
   setFabricMode(currentFabric);
+}
+
+function setModelShadow(mode) {
+  currentModelShadow = mode;
+  applyAllShadows();
+}
+
+function setFloorShadow(mode) {
+  currentFloorShadow = mode;
+  applyAllShadows();
 }
 
 // --- Env lighting mode ---
@@ -456,7 +461,8 @@ let currentWood = "HF Custom Natural";
 let currentTexExt = "jpg";
 let currentRes = "2k";
 let currentFabric       = "Full PBR";
-let currentShadow       = "Real-time + Contact";
+let currentModelShadow  = "Real-time";
+let currentFloorShadow  = "Real-time";
 let currentCompression  = "Draco";
 
 // --- Camera tween ---
@@ -748,7 +754,7 @@ async function loadAndSetupModel(path) {
 
   await applyLeather(currentLeather);
   await applyWood(currentWood);
-  setShadowMode(currentShadow);
+  applyAllShadows();
 
   loadingEl.classList.add('hidden');
   metrics.markModelLoaded();
