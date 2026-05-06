@@ -51,6 +51,8 @@ const sidebar = initSidebar(async (categoryId, option) => {
     setEnvLighting(option);
   } else if (categoryId === "mipmaps") {
     setMipmaps(option);
+  } else if (categoryId === "anisotropy") {
+    setAnisotropy(option);
   }
 }, { leather: "906700-81", wood: "HF Custom Bramble" });
 
@@ -396,6 +398,33 @@ function setMipmaps(mode) {
     seen.add(tex);
     tex.generateMipmaps = on;
     tex.minFilter = minFilter;
+    tex.needsUpdate = true;
+  }
+
+  if (loadedModel) {
+    loadedModel.traverse(node => {
+      if (!node.isMesh || !node.material) return;
+      const mat = node.material;
+      ['map', 'normalMap', 'roughnessMap', 'aoMap', 'emissiveMap', 'metalnessMap'].forEach(k => applyTo(mat[k]));
+    });
+  }
+
+  [leatherBake.normalMap, leatherBake.aoMap, leatherBake.leatherAO].forEach(applyTo);
+  Object.values(leatherTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
+  Object.values(woodTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
+}
+
+// --- Anisotropy ---
+
+function setAnisotropy(option) {
+  const max   = renderer.capabilities.getMaxAnisotropy();
+  const value = option === 'MAX' ? max : Math.min(parseInt(option), max);
+
+  const seen = new Set();
+  function applyTo(tex) {
+    if (!tex || seen.has(tex)) return;
+    seen.add(tex);
+    tex.anisotropy = value;
     tex.needsUpdate = true;
   }
 
