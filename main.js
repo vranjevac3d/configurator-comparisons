@@ -334,6 +334,10 @@ function setFabricMode(mode) {
     const isWood = mat.name.includes('wood');
     if (!isBake && !isWelt && !isWood) return;
 
+    const prevNormal    = mat.normalMap;
+    const prevRoughness = mat.roughnessMap;
+    const prevAoMap     = mat.aoMap;
+
     mat.normalMap    = showNormal    ? mat.userData.fullPBR_normalMap    ?? mat.normalMap    : null;
     mat.roughnessMap = showRoughness ? mat.userData.fullPBR_roughnessMap ?? mat.roughnessMap : null;
     if (isBake) {
@@ -345,7 +349,11 @@ function setFabricMode(mode) {
       mat.userData.pendingAoMap2 = ao2;
       if (mat.userData.shader) mat.userData.shader.uniforms.aoMap2.value = ao2;
     }
-    mat.needsUpdate = true;
+
+    // Only recompile when defines change (texture null↔set transitions)
+    if (mat.normalMap !== prevNormal || mat.roughnessMap !== prevRoughness || mat.aoMap !== prevAoMap) {
+      mat.needsUpdate = true;
+    }
   });
 }
 
