@@ -52,14 +52,6 @@ const CATEGORIES = [
     options: ['Merged', 'Separate', 'BatchedMesh'], default: 'Separate',
   },
   {
-    id: 'transparency', label: 'Transparency',
-    options: ['Alpha blend', 'Alpha test', 'Dithered alpha'], default: 'Alpha blend',
-  },
-  {
-    id: 'postprocessing', label: 'Post Processing',
-    options: ['Bloom', 'SSAO', 'DOF', 'Minimal', 'None'], default: 'None',
-  },
-  {
     id: 'textureFiles', label: 'Texture Files',
     options: ['Texture atlas', 'Separate'], default: 'Separate',
   },
@@ -97,7 +89,7 @@ export function initSidebar(onChange, defaults = {}) {
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
 
-  const WIP_IDS = new Set(['modelComplexity', 'format', 'compression', 'lod']);
+  const WIP_IDS = new Set(['modelComplexity', 'format', 'compression', 'lod', 'drawCallBatching', 'textureFiles', 'renderer']);
   const WIP_OPTS = new Set(['envLighting:Baked lightmaps']);
 
   CATEGORIES.forEach((cat) => {
