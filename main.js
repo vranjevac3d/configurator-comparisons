@@ -360,20 +360,21 @@ function setFabricMode(mode) {
 // --- Shadow modes ---
 
 function applyAllShadows() {
-  const modelRT    = currentModelShadow === 'Real-time';
-  const floorRT    = currentFloorShadow === 'Real-time';
-  const floorBaked = currentFloorShadow === 'Baked';
+  const modelRT      = currentModelShadow === 'Real-time';
+  const floorContact = currentFloorShadow === 'Contact';
+  const floorRT      = currentFloorShadow === 'Real-time';
+  const floorBaked   = currentFloorShadow === 'Baked';
 
-  renderer.shadowMap.enabled = modelRT;
-  shadowLight.castShadow     = modelRT;
+  renderer.shadowMap.enabled = modelRT || floorRT;
+  shadowLight.castShadow     = modelRT || floorRT;
 
   if (loadedModel) loadedModel.traverse(n => {
     if (n.isMesh) { n.castShadow = modelRT; n.receiveShadow = modelRT; }
   });
 
-  if (shadowGroup) shadowGroup.visible = floorRT;
+  if (shadowGroup) shadowGroup.visible = floorContact;
   if (floorMesh)   floorMesh.visible   = floorBaked;
-  if (rtFloor)     rtFloor.visible     = false;
+  if (rtFloor)     rtFloor.visible     = floorRT;
 
   setFabricMode(currentFabric);
 }
@@ -470,7 +471,7 @@ let currentTexExt = "jpg";
 let currentRes = "2k";
 let currentFabric       = "Full PBR";
 let currentModelShadow  = "Real-time";
-let currentFloorShadow  = "Real-time";
+let currentFloorShadow  = "Contact";
 let currentCompression  = "Draco";
 
 // --- Camera tween ---

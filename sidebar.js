@@ -37,7 +37,7 @@ const CATEGORIES = [
   },
   {
     id: 'floorShadows', label: 'Floor Shadows',
-    options: ['Real-time', 'Baked', 'None'], default: 'Real-time',
+    options: ['Contact', 'Real-time', 'Baked', 'None'], default: 'Contact',
   },
   {
     id: 'renderer', label: 'Renderer',
