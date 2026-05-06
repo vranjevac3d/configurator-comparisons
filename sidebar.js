@@ -32,10 +32,6 @@ const CATEGORIES = [
     options: ['HDR map', 'Flat ambient', 'Baked lightmaps'], default: 'HDR map',
   },
   {
-    id: 'instancing', label: 'Instancing',
-    options: ['InstancedMesh', 'Cloning'], default: 'InstancedMesh',
-  },
-  {
     id: 'shadows', label: 'Shadows',
     options: ['Real-time', 'Real-time + Contact', 'Baked', 'Contact only', 'All', 'None'], default: 'Real-time + Contact',
   },
