@@ -43,6 +43,8 @@ const sidebar = initSidebar(async (categoryId, option) => {
     }
   } else if (categoryId === "shadows") {
     setShadowMode(option);
+  } else if (categoryId === "fabrics") {
+    setFabricMode(option);
   }
 }, { leather: "906700-81", wood: "HF Custom Bramble" });
 
@@ -288,6 +290,35 @@ function setupNormalBlend(mat) {
   };
 }
 
+// --- Fabric mode ---
+
+function setFabricMode(mode) {
+  currentFabric = mode;
+  if (!loadedModel) return;
+
+  const showNormal    = mode === 'Full PBR' || mode === 'Normal Map';
+  const showRoughness = mode === 'Full PBR';
+  const showAO        = mode === 'Full PBR' || mode === 'AO Map';
+
+  loadedModel.traverse((node) => {
+    if (!node.isMesh) return;
+    const mat = node.material;
+    if (!mat) return;
+
+    const isBake = materialWithBake(mat.name);
+    const isWelt = !isBake && mat.name.includes('welt');
+    const isWood = mat.name.includes('wood');
+    if (!isBake && !isWelt && !isWood) return;
+
+    mat.normalMap    = showNormal    ? mat.userData.fullPBR_normalMap    ?? mat.normalMap    : null;
+    mat.roughnessMap = showRoughness ? mat.userData.fullPBR_roughnessMap ?? mat.roughnessMap : null;
+    if (isBake) {
+      mat.aoMap = showAO ? mat.userData.fullPBR_aoMap ?? mat.aoMap : null;
+    }
+    mat.needsUpdate = true;
+  });
+}
+
 // --- Shadow mode ---
 
 function setShadowMode(mode) {
@@ -325,6 +356,7 @@ let currentLeather = "906700-81";
 let currentWood = "HF Custom Natural";
 let currentTexExt = "jpg";
 let currentRes = "2k";
+let currentFabric = "Full PBR";
 
 // --- Contact shadow setup ---
 
@@ -399,18 +431,22 @@ async function applyLeather(sku) {
     if (isBake) {
       // Keep mat.normalMap = baked normal (set in model load).
       // Deliver the tiling leather detail via normalMap2 uniform.
-      mat.userData.detailNormal = tex.normalMap;
+      mat.userData.detailNormal         = tex.normalMap;
+      mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
       if (mat.userData.shader) {
         mat.userData.shader.uniforms.normalMap2.value = tex.normalMap;
       }
     } else {
       // Welt: no bake setup, just assign the tiling normal directly
-      mat.normalMap        = tex.normalMap;
-      mat.normalMap.channel = 0;
-      mat.needsUpdate      = true;
+      mat.normalMap                     = tex.normalMap;
+      mat.normalMap.channel             = 0;
+      mat.userData.fullPBR_normalMap    = tex.normalMap;
+      mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
+      mat.needsUpdate                   = true;
     }
   });
 
+  setFabricMode(currentFabric);
 }
 
 // --- Wood texture switcher ---
@@ -442,11 +478,14 @@ async function applyWood(name) {
     if (!node.isMesh) return;
     const mat = node.material;
     if (!mat || !mat.name.includes("wood")) return;
-    mat.map          = tex.map;
-    mat.normalMap    = tex.normalMap;
-    mat.roughnessMap = tex.roughnessMap;
-    mat.needsUpdate  = true;
+    mat.map                           = tex.map;
+    mat.normalMap                     = tex.normalMap;
+    mat.roughnessMap                  = tex.roughnessMap;
+    mat.userData.fullPBR_normalMap    = tex.normalMap;
+    mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
+    mat.needsUpdate                   = true;
   });
+  setFabricMode(currentFabric);
 }
 
 // --- Load model ---
@@ -497,6 +536,8 @@ gltfLoader.load(`/${SKU}/${SKU}.gltf`, async (gltf) => {
         mat.aoMap     = aoSource;
       }
 
+      mat.userData.fullPBR_normalMap = mat.normalMap;
+      mat.userData.fullPBR_aoMap     = mat.aoMap;
       setupNormalBlend(mat);
       mat.needsUpdate = true;
     }
