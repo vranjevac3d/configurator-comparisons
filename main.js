@@ -16,36 +16,28 @@ import { MetricsTracker } from "./metrics.js";
 // --- Sidebar ---
 
 const loadingEl = document.getElementById("loading");
-const texLoadingEl = document.getElementById("tex-loading");
 
-async function reloadTextures() {
-  texLoadingEl.classList.remove("hidden");
-  metrics.reset();
-  metrics.markLoadStart();
-  await Promise.all([applyLeather(currentLeather), applyWood(currentWood)]);
-  metrics.markLoadEnd();
-  metrics.markModelLoaded();
-  texLoadingEl.classList.add("hidden");
+// --- URL params ---
+
+const _params = new URLSearchParams(location.search);
+function getParam(key, fallback) { return _params.get(key) ?? fallback; }
+function navigateWithParam(key, value) {
+  const p = new URLSearchParams(location.search);
+  p.set(key, value);
+  location.href = `?${p}`;
 }
 
-const sidebar = initSidebar(async (categoryId, option) => {
-  if (categoryId === "leather") {
-    applyLeather(option);
-  } else if (categoryId === "wood") {
-    applyWood(option);
-  } else if (categoryId === "textures") {
-    const extMap = { JPG: "jpg", WebP: "webp", KTX2: "ktx2", AVIF: "avif" };
-    if (extMap[option]) {
-      currentTexExt = extMap[option];
-      await reloadTextures();
-    }
+const sidebar = initSidebar((categoryId, option) => {
+  if (categoryId === "textures") {
+    navigateWithParam("texture", { JPG: "jpg", WebP: "webp", KTX2: "ktx2", AVIF: "avif" }[option]);
   } else if (categoryId === "resolution") {
-    const resMap = { "2K": "2k", "1K": "1k", "512px": "512" };
-    if (resMap[option]) {
-      currentRes = resMap[option];
-      if (armCamPos) tweenCamera(armCamPos, armCamTarget);
-      await reloadTextures();
-    }
+    navigateWithParam("res", { "2K": "2k", "1K": "1k", "512px": "512" }[option]);
+  } else if (categoryId === "compression") {
+    navigateWithParam("compression", { Draco: "draco", None: "none" }[option]);
+  } else if (categoryId === "leather") {
+    navigateWithParam("leather", option);
+  } else if (categoryId === "wood") {
+    navigateWithParam("wood", option);
   } else if (categoryId === "modelShadows") {
     setModelShadow(option);
   } else if (categoryId === "floorShadows") {
@@ -55,14 +47,18 @@ const sidebar = initSidebar(async (categoryId, option) => {
     setFabricMode(option);
   } else if (categoryId === "envLighting") {
     setEnvLighting(option);
-  } else if (categoryId === "compression") {
-    setCompression(option);
   } else if (categoryId === "anisotropy") {
     setAnisotropy(option);
   } else if (categoryId === "gtao") {
     setGTAO(option);
   }
-}, { leather: "906700-81", wood: "HF Custom Bramble" });
+}, {
+  textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
+  resolution:  { "2k": "2K", "1k": "1K", "512": "512px" }[getParam("res", "2k")]                    ?? "2K",
+  compression: { draco: "Draco", none: "None" }[getParam("compression", "draco")]                     ?? "Draco",
+  leather:     getParam("leather", "906700-81"),
+  wood:        getParam("wood", "HF Custom Bramble"),
+});
 
 // --- Renderer ---
 
@@ -451,8 +447,8 @@ function setAnisotropy(option) {
   }
 
   [leatherBake.normalMap, leatherBake.aoMap, leatherBake.leatherAO].forEach(applyTo);
-  Object.values(leatherTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
-  Object.values(woodTexCache).forEach(t => [t.map, t.normalMap, t.roughnessMap].forEach(applyTo));
+  if (currentLeatherTex) [currentLeatherTex.map, currentLeatherTex.normalMap, currentLeatherTex.roughnessMap].forEach(applyTo);
+  if (currentWoodTex) [currentWoodTex.map, currentWoodTex.normalMap, currentWoodTex.roughnessMap].forEach(applyTo);
 }
 
 // --- Scene state ---
@@ -463,14 +459,13 @@ window.player = player;
 let loadedModel = null;
 let floorMesh   = null;
 let rtFloor     = null;
-let currentLeather = "906700-81";
-let currentWood = "HF Custom Bramble";
-let currentTexExt = "jpg";
-let currentRes = "2k";
+let currentLeather = getParam("leather", "906700-81");
+let currentWood    = getParam("wood", "HF Custom Bramble");
+let currentTexExt  = getParam("texture", "jpg");
+let currentRes     = getParam("res", "2k");
 let currentFabric       = "Full PBR";
 let currentModelShadow  = "Real-time";
 let currentFloorShadow  = "Contact";
-let currentCompression  = "Draco";
 
 // --- Camera tween ---
 
@@ -526,11 +521,9 @@ function updateContactShadow() {
 
 // --- Leather texture switcher ---
 
-const leatherTexCache = {};
+let currentLeatherTex = null;
 
 async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
-  const key = `${sku}_${res}_${ext}`;
-  if (leatherTexCache[key]) return leatherTexCache[key];
   const base = `/leathers/${sku}/${res}/${sku}`;
   const [map, normalMap, roughnessMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
@@ -541,14 +534,19 @@ async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
   map.repeat.set(10, 10);
   normalMap.repeat.set(10, 10);
   roughnessMap.repeat.set(10, 10);
-  leatherTexCache[key] = { map, normalMap, roughnessMap };
-  return leatherTexCache[key];
+  return { map, normalMap, roughnessMap };
 }
 
 async function applyLeather(sku) {
   currentLeather = sku;
   if (!loadedModel) return;
   const tex = await loadLeatherTextures(sku, currentTexExt, currentRes);
+  if (currentLeatherTex) {
+    currentLeatherTex.map.dispose();
+    currentLeatherTex.normalMap.dispose();
+    currentLeatherTex.roughnessMap.dispose();
+  }
+  currentLeatherTex = tex;
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
@@ -586,11 +584,9 @@ async function applyLeather(sku) {
 
 // --- Wood texture switcher ---
 
-const woodTexCache = {};
+let currentWoodTex = null;
 
 async function loadWoodTextures(name, ext = "jpg", res = "2k") {
-  const key = `${name}_${res}_${ext}`;
-  if (woodTexCache[key]) return woodTexCache[key];
   const base = `/wood/${name}/${res}/${name}`;
   const [map, normalMap, roughnessMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
@@ -601,14 +597,19 @@ async function loadWoodTextures(name, ext = "jpg", res = "2k") {
   map.repeat.set(10, 10);
   normalMap.repeat.set(10, 10);
   roughnessMap.repeat.set(10, 10);
-  woodTexCache[key] = { map, normalMap, roughnessMap };
-  return woodTexCache[key];
+  return { map, normalMap, roughnessMap };
 }
 
 async function applyWood(name) {
   currentWood = name;
   if (!loadedModel) return;
   const tex = await loadWoodTextures(name, currentTexExt, currentRes);
+  if (currentWoodTex) {
+    currentWoodTex.map.dispose();
+    currentWoodTex.normalMap.dispose();
+    currentWoodTex.roughnessMap.dispose();
+  }
+  currentWoodTex = tex;
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
     const mat = node.material;
@@ -767,15 +768,11 @@ async function loadAndSetupModel(path) {
   metrics.markModelLoaded();
 }
 
-function setCompression(mode) {
-  currentCompression = mode;
-  const path = mode === 'None'
+await loadAndSetupModel(
+  getParam("compression", "draco") === "none"
     ? `/${SKU}/${SKU}-no-compression.gltf`
-    : `/${SKU}/${SKU}.gltf`;
-  loadAndSetupModel(path);
-}
-
-await loadAndSetupModel(`/${SKU}/${SKU}.gltf`);
+    : `/${SKU}/${SKU}.gltf`
+);
 
 // --- Resize ---
 

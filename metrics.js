@@ -15,6 +15,7 @@ export class MetricsTracker {
   markLoadEnd()   { this._loadEnd   = performance.now(); }
 
   reset() {
+    performance.clearResourceTimings?.();
     this._samples         = [];
     this._loadStart       = null;
     this._loadEnd         = null;

@@ -119,7 +119,8 @@ export function initSidebar(onChange, defaults = {}) {
     cat.options.forEach((opt) => {
       const wipOpt = WIP_OPTS.has(`${cat.id}:${opt}`);
       const btn = document.createElement('button');
-      btn.className = 'sb-opt' + (opt === cat.default ? ' active' : '') + (wipOpt ? ' sb-opt-wip' : '');
+      const activeOpt = defaults[cat.id] ?? cat.default;
+      btn.className = 'sb-opt' + (opt === activeOpt ? ' active' : '') + (wipOpt ? ' sb-opt-wip' : '');
       btn.textContent = opt;
       if (!wip && !wipOpt) {
         btn.addEventListener('click', () => {
