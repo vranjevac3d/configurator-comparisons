@@ -45,21 +45,15 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "wood") {
     navigateWithParam("wood", option);
   } else if (categoryId === "modelShadows") {
-    setParam("modelShadow", option);
-    setModelShadow(option);
+    navigateWithParam("modelShadow", option);
   } else if (categoryId === "floorShadows") {
-    setParam("floorShadow", option);
-    setFloorShadow(option);
+    navigateWithParam("floorShadow", option);
   } else if (categoryId === "fabrics") {
-    setParam("fabric", option);
-    if (seatCamPos) tweenCamera(seatCamPos, seatCamTarget);
-    setFabricMode(option);
+    navigateWithParam("fabric", option);
   } else if (categoryId === "envLighting") {
-    setParam("envLight", option);
-    setEnvLighting(option);
+    navigateWithParam("envLight", option);
   } else if (categoryId === "anisotropy") {
-    setParam("anisotropy", option);
-    setAnisotropy(option);
+    navigateWithParam("anisotropy", option);
   }
 }, {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
@@ -149,14 +143,14 @@ scene.add(ambientLight);
 
 let hdrTexture = null;
 
-new RGBELoader().load("/hdr.hdr", (hdr) => {
-  hdr.mapping = THREE.EquirectangularReflectionMapping;
-  hdrTexture = hdr;
-  if (getParam("envLight", "HDR map") !== "Flat ambient") {
+if (getParam("envLight", "HDR map") !== "Flat ambient") {
+  new RGBELoader().load("/hdr.hdr", (hdr) => {
+    hdr.mapping = THREE.EquirectangularReflectionMapping;
+    hdrTexture = hdr;
     scene.environment = hdr;
     scene.environmentIntensity = 0.45;
-  }
-});
+  });
+}
 
 // --- Material name helpers (ported from hookerfurniture-pwa core.js) ---
 
@@ -250,10 +244,15 @@ function loadTexture(path) {
 
 const SKU = "641-25";
 
+const _fabricAtLoad      = getParam("fabric", "Full PBR");
+const _needsNormal       = _fabricAtLoad === 'Full PBR' || _fabricAtLoad === 'Normal Map';
+const _needsAO           = _fabricAtLoad === 'Full PBR' || _fabricAtLoad === 'AO Map';
+const _needsBakedShadow  = _needsAO && getParam("floorShadow", "Contact") === 'Baked';
+
 const leatherBake = {
-  normalMap: await loadTexture(`/${SKU}/${SKU}_LEATHER_Normal.jpg`),
-  aoMap:     await loadTexture(`/${SKU}/Baked_Shadows.png`),
-  leatherAO: await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`),
+  normalMap: _needsNormal      ? await loadTexture(`/${SKU}/${SKU}_LEATHER_Normal.jpg`) : null,
+  aoMap:     _needsBakedShadow ? await loadTexture(`/${SKU}/Baked_Shadows.png`)         : null,
+  leatherAO: _needsAO          ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)     : null,
 };
 
 // --- Normal-blend shader (baked large-scale + tiling detail, like pwa) ---
@@ -311,7 +310,7 @@ const normalBlendChunk = `
 function setupNormalBlend(mat, useUV1ForAO2 = false) {
   mat.onBeforeCompile = (shader) => {
     mat.userData.shader = shader;
-    shader.uniforms.normalMap2 = { value: mat.userData.detailNormal || leatherBake.normalMap };
+    shader.uniforms.normalMap2 = { value: mat.userData.detailNormal || leatherBake.normalMap || neutralAO };
     shader.uniforms.aoMap2     = { value: mat.userData.pendingAoMap2 || neutralAO };
 
     shader.vertexShader = shader.vertexShader.replace(
@@ -351,7 +350,7 @@ function setFabricMode(mode) {
   currentFabric = mode;
   if (!loadedModel) return;
 
-  const bakedShadow   = currentModelShadow === 'Baked';
+  const bakedShadow   = currentFloorShadow === 'Baked';
   const showNormal    = mode === 'Full PBR' || mode === 'Normal Map';
   const showRoughness = mode === 'Full PBR';
   const showAO        = mode === 'Full PBR' || mode === 'AO Map';
@@ -536,16 +535,18 @@ function updateContactShadow() {
 let currentLeatherTex = null;
 
 async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
-  const base = `/leathers/${sku}/${res}/${sku}`;
+  const base     = `/leathers/${sku}/${res}/${sku}`;
+  const needsNrm = currentFabric === 'Full PBR' || currentFabric === 'Normal Map';
+  const needsRgh = currentFabric === 'Full PBR';
   const [map, normalMap, roughnessMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
-    loadTexture(`${base}_normal.${ext}`),
-    loadTexture(`${base}_roughness.${ext}`),
+    needsNrm ? loadTexture(`${base}_normal.${ext}`)    : Promise.resolve(null),
+    needsRgh ? loadTexture(`${base}_roughness.${ext}`) : Promise.resolve(null),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
-  normalMap.repeat.set(10, 10);
-  roughnessMap.repeat.set(10, 10);
+  if (normalMap)    normalMap.repeat.set(10, 10);
+  if (roughnessMap) roughnessMap.repeat.set(10, 10);
   return { map, normalMap, roughnessMap };
 }
 
@@ -555,8 +556,8 @@ async function applyLeather(sku) {
   const tex = await loadLeatherTextures(sku, currentTexExt, currentRes);
   if (currentLeatherTex) {
     currentLeatherTex.map.dispose();
-    currentLeatherTex.normalMap.dispose();
-    currentLeatherTex.roughnessMap.dispose();
+    currentLeatherTex.normalMap?.dispose();
+    currentLeatherTex.roughnessMap?.dispose();
   }
   currentLeatherTex = tex;
 
@@ -574,17 +575,15 @@ async function applyLeather(sku) {
     mat.needsUpdate  = true;
 
     if (isBake) {
-      // Keep mat.normalMap = baked normal (set in model load).
-      // Deliver the tiling leather detail via normalMap2 uniform.
       mat.userData.detailNormal         = tex.normalMap;
       mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
       if (mat.userData.shader) {
-        mat.userData.shader.uniforms.normalMap2.value = tex.normalMap;
+        mat.userData.shader.uniforms.normalMap2.value = tex.normalMap || neutralAO;
       }
     } else {
       // Welt: no bake setup, just assign the tiling normal directly
-      mat.normalMap                     = tex.normalMap;
-      mat.normalMap.channel             = 0;
+      mat.normalMap = tex.normalMap ?? null;
+      if (tex.normalMap) tex.normalMap.channel = 0;
       mat.userData.fullPBR_normalMap    = tex.normalMap;
       mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
       mat.needsUpdate                   = true;
@@ -599,16 +598,18 @@ async function applyLeather(sku) {
 let currentWoodTex = null;
 
 async function loadWoodTextures(name, ext = "jpg", res = "2k") {
-  const base = `/wood/${name}/${res}/${name}`;
+  const base     = `/wood/${name}/${res}/${name}`;
+  const needsNrm = currentFabric === 'Full PBR' || currentFabric === 'Normal Map';
+  const needsRgh = currentFabric === 'Full PBR';
   const [map, normalMap, roughnessMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
-    loadTexture(`${base}_normal.${ext}`),
-    loadTexture(`${base}_roughness.${ext}`),
+    needsNrm ? loadTexture(`${base}_normal.${ext}`)    : Promise.resolve(null),
+    needsRgh ? loadTexture(`${base}_roughness.${ext}`) : Promise.resolve(null),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
-  normalMap.repeat.set(10, 10);
-  roughnessMap.repeat.set(10, 10);
+  if (normalMap)    normalMap.repeat.set(10, 10);
+  if (roughnessMap) roughnessMap.repeat.set(10, 10);
   return { map, normalMap, roughnessMap };
 }
 
@@ -618,8 +619,8 @@ async function applyWood(name) {
   const tex = await loadWoodTextures(name, currentTexExt, currentRes);
   if (currentWoodTex) {
     currentWoodTex.map.dispose();
-    currentWoodTex.normalMap.dispose();
-    currentWoodTex.roughnessMap.dispose();
+    currentWoodTex.normalMap?.dispose();
+    currentWoodTex.roughnessMap?.dispose();
   }
   currentWoodTex = tex;
   loadedModel.traverse((node) => {
@@ -709,15 +710,13 @@ async function loadAndSetupModel(path) {
       const isArm      = mat.name === 'arm' || mat.name.startsWith('arm_');
 
       if (hasUV1) {
-        const n = leatherBake.normalMap.clone(); n.channel = 1;
-        mat.normalMap = n;
-        const ao = leatherBake.leatherAO.clone(); ao.channel = 1;
-        mat.aoMap = ao;
+        if (leatherBake.normalMap) { const n = leatherBake.normalMap.clone(); n.channel = 1; mat.normalMap = n; }
+        if (leatherBake.leatherAO) { const ao = leatherBake.leatherAO.clone(); ao.channel = 1; mat.aoMap = ao; }
       } else {
         mat.normalMap = leatherBake.normalMap;
         mat.aoMap     = leatherBake.leatherAO;
       }
-      if (!isArm) mat.userData.bakedShadowsAO = leatherBake.aoMap;
+      if (!isArm && leatherBake.aoMap) mat.userData.bakedShadowsAO = leatherBake.aoMap;
 
       mat.userData.fullPBR_normalMap = mat.normalMap;
       mat.userData.fullPBR_aoMap     = mat.aoMap;
