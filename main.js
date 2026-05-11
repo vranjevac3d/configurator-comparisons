@@ -27,6 +27,12 @@ function navigateWithParam(key, value) {
   location.href = `?${p}`;
 }
 
+function setParam(key, value) {
+  const p = new URLSearchParams(location.search);
+  p.set(key, value);
+  history.replaceState(null, '', `?${p}`);
+}
+
 const sidebar = initSidebar((categoryId, option) => {
   if (categoryId === "textures") {
     navigateWithParam("texture", { JPG: "jpg", WebP: "webp", KTX2: "ktx2", AVIF: "avif" }[option]);
@@ -39,25 +45,37 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "wood") {
     navigateWithParam("wood", option);
   } else if (categoryId === "modelShadows") {
+    setParam("modelShadow", option);
     setModelShadow(option);
   } else if (categoryId === "floorShadows") {
+    setParam("floorShadow", option);
     setFloorShadow(option);
   } else if (categoryId === "fabrics") {
+    setParam("fabric", option);
     if (seatCamPos) tweenCamera(seatCamPos, seatCamTarget);
     setFabricMode(option);
   } else if (categoryId === "envLighting") {
+    setParam("envLight", option);
     setEnvLighting(option);
   } else if (categoryId === "anisotropy") {
+    setParam("anisotropy", option);
     setAnisotropy(option);
   } else if (categoryId === "gtao") {
+    setParam("gtao", option);
     setGTAO(option);
   }
 }, {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
   resolution:  { "2k": "2K", "1k": "1K", "512": "512px" }[getParam("res", "2k")]                    ?? "2K",
   compression: { draco: "Draco", none: "None" }[getParam("compression", "draco")]                     ?? "Draco",
-  leather:     getParam("leather", "906700-81"),
-  wood:        getParam("wood", "HF Custom Bramble"),
+  leather:      getParam("leather", "906700-81"),
+  wood:         getParam("wood", "HF Custom Bramble"),
+  fabrics:      getParam("fabric", "Full PBR"),
+  modelShadows: getParam("modelShadow", "Real-time"),
+  floorShadows: getParam("floorShadow", "Contact"),
+  envLighting:  getParam("envLight", "HDR map"),
+  anisotropy:   getParam("anisotropy", "4x"),
+  gtao:         getParam("gtao", "Off"),
 });
 
 // --- Renderer ---
@@ -99,7 +117,7 @@ gtaoPass.distanceExponent = 2;
 gtaoPass.thickness = 1;
 gtaoPass.scale = 1;
 gtaoPass.samples = 16;
-gtaoPass.enabled = false;
+gtaoPass.enabled = getParam("gtao", "Off") === "On";
 composer.addPass(gtaoPass);
 
 composer.addPass(new OutputPass());
@@ -129,7 +147,7 @@ cameraLight.position.set(-2, 2, 2);
 camera.add(cameraLight);
 scene.add(camera);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.0035);
+const ambientLight = new THREE.AmbientLight(0xffffff, getParam("envLight", "HDR map") === "Flat ambient" ? 1.0 : 0.0035);
 scene.add(ambientLight);
 
 // --- HDR environment ---
@@ -139,8 +157,10 @@ let hdrTexture = null;
 new RGBELoader().load("/hdr.hdr", (hdr) => {
   hdr.mapping = THREE.EquirectangularReflectionMapping;
   hdrTexture = hdr;
-  scene.environment = hdr;
-  scene.environmentIntensity = 0.45;
+  if (getParam("envLight", "HDR map") !== "Flat ambient") {
+    scene.environment = hdr;
+    scene.environmentIntensity = 0.45;
+  }
 });
 
 // --- Material name helpers (ported from hookerfurniture-pwa core.js) ---
@@ -463,9 +483,9 @@ let currentLeather = getParam("leather", "906700-81");
 let currentWood    = getParam("wood", "HF Custom Bramble");
 let currentTexExt  = getParam("texture", "jpg");
 let currentRes     = getParam("res", "2k");
-let currentFabric       = "Full PBR";
-let currentModelShadow  = "Real-time";
-let currentFloorShadow  = "Contact";
+let currentFabric      = getParam("fabric", "Full PBR");
+let currentModelShadow = getParam("modelShadow", "Real-time");
+let currentFloorShadow = getParam("floorShadow", "Contact");
 
 // --- Camera tween ---
 
@@ -763,6 +783,7 @@ async function loadAndSetupModel(path) {
   await applyLeather(currentLeather);
   await applyWood(currentWood);
   applyAllShadows();
+  setAnisotropy(getParam("anisotropy", "4x"));
 
   loadingEl.classList.add('hidden');
   metrics.markModelLoaded();
