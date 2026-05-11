@@ -60,9 +60,6 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "anisotropy") {
     setParam("anisotropy", option);
     setAnisotropy(option);
-  } else if (categoryId === "gtao") {
-    setParam("gtao", option);
-    setGTAO(option);
   }
 }, {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
@@ -75,7 +72,6 @@ const sidebar = initSidebar((categoryId, option) => {
   floorShadows: getParam("floorShadow", "Contact"),
   envLighting:  getParam("envLight", "HDR map"),
   anisotropy:   getParam("anisotropy", "4x"),
-  gtao:         getParam("gtao", "Off"),
 });
 
 // --- Renderer ---
@@ -117,7 +113,6 @@ gtaoPass.distanceExponent = 2;
 gtaoPass.thickness = 1;
 gtaoPass.scale = 1;
 gtaoPass.samples = 16;
-gtaoPass.enabled = getParam("gtao", "Off") === "On";
 composer.addPass(gtaoPass);
 
 composer.addPass(new OutputPass());
@@ -405,6 +400,7 @@ function applyAllShadows() {
 
   renderer.shadowMap.enabled = modelRT || floorRT;
   shadowLight.castShadow     = modelRT || floorRT;
+  gtaoPass.enabled           = currentModelShadow === 'GTAO';
 
   if (loadedModel) loadedModel.traverse(n => {
     if (n.isMesh) { n.castShadow = modelRT; n.receiveShadow = modelRT; }
@@ -425,10 +421,6 @@ function setModelShadow(mode) {
 function setFloorShadow(mode) {
   currentFloorShadow = mode;
   applyAllShadows();
-}
-
-function setGTAO(mode) {
-  gtaoPass.enabled = (mode === 'On');
 }
 
 // --- Env lighting mode ---
