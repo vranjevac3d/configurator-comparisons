@@ -12,8 +12,9 @@ const CATEGORIES = [
     options: ['High poly', 'Low poly + Normal', 'Low poly + AO'], default: 'High poly',
   },
   {
-    id: 'fabrics', label: 'Fabrics',
-    options: ['Full PBR', 'Diffuse', 'Normal Map', 'AO Map'], default: 'Full PBR',
+    id: 'fabrics', label: 'Material',
+    options: ['Full PBR', 'Diffuse', 'Normal Map', 'Roughness Map', 'AO Map'], default: 'Full PBR',
+    multiSelect: true,
   },
   {
     id: 'format', label: '3D Format',
@@ -82,6 +83,10 @@ export function initSidebar(onChange, defaults = {}) {
   header.textContent = 'Configurator Compare';
   sidebar.appendChild(header);
 
+  let _matOpts = null;
+  let _matSet  = null;
+  let _matOnChange = null;
+
   // Config tab header
   const configHeader = document.createElement('div');
   configHeader.className = 'sb-tab-header';
@@ -115,21 +120,57 @@ export function initSidebar(onChange, defaults = {}) {
       opts.appendChild(wipBadge);
     }
 
-    cat.options.forEach((opt) => {
-      const wipOpt = WIP_OPTS.has(`${cat.id}:${opt}`);
-      const btn = document.createElement('button');
-      const activeOpt = defaults[cat.id] ?? cat.default;
-      btn.className = 'sb-opt' + (opt === activeOpt ? ' active' : '') + (wipOpt ? ' sb-opt-wip' : '');
-      btn.textContent = opt;
-      if (!wip && !wipOpt) {
+    if (cat.multiSelect && !wip) {
+      const VALS = { 'Full PBR': 'fullpbr', 'Diffuse': 'diffuse', 'Normal Map': 'normal', 'Roughness Map': 'roughness', 'AO Map': 'ao' };
+      const rawDefault = defaults[cat.id] ?? 'fullpbr';
+      // support legacy label values from old URLs
+      const normalized = VALS[rawDefault] ?? rawDefault;
+      const activeSet = new Set(normalized.split(','));
+      if (!activeSet.has('fullpbr')) activeSet.add('diffuse');
+      if (cat.id === 'fabrics') { _matOpts = opts; _matSet = activeSet; _matOnChange = () => onChange?.(cat.id, [...activeSet].join(',')); }
+
+      cat.options.forEach((opt) => {
+        const val = VALS[opt] ?? opt.toLowerCase().replace(/\s+/g, '');
+        const btn = document.createElement('button');
+        btn.className = 'sb-opt' + (activeSet.has(val) ? ' active' : '');
+        btn.dataset.val = val;
+        btn.textContent = opt;
         btn.addEventListener('click', () => {
-          opts.querySelectorAll('.sb-opt').forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
-          onChange?.(cat.id, opt);
+          if (val === 'fullpbr') {
+            activeSet.clear();
+            activeSet.add('fullpbr');
+          } else {
+            activeSet.delete('fullpbr');
+            activeSet.add('diffuse');
+            if (val !== 'diffuse') {
+              if (activeSet.has(val)) activeSet.delete(val);
+              else activeSet.add(val);
+            }
+          }
+          opts.querySelectorAll('.sb-opt').forEach(b => {
+            b.classList.toggle('active', activeSet.has(b.dataset.val));
+          });
+          onChange?.(cat.id, [...activeSet].join(','));
         });
-      }
-      opts.appendChild(btn);
-    });
+        opts.appendChild(btn);
+      });
+    } else {
+      cat.options.forEach((opt) => {
+        const wipOpt = WIP_OPTS.has(`${cat.id}:${opt}`);
+        const btn = document.createElement('button');
+        const activeOpt = defaults[cat.id] ?? cat.default;
+        btn.className = 'sb-opt' + (opt === activeOpt ? ' active' : '') + (wipOpt ? ' sb-opt-wip' : '');
+        btn.textContent = opt;
+        if (!wip && !wipOpt) {
+          btn.addEventListener('click', () => {
+            opts.querySelectorAll('.sb-opt').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            onChange?.(cat.id, opt);
+          });
+        }
+        opts.appendChild(btn);
+      });
+    }
 
     row.appendChild(opts);
     configEl.appendChild(row);
@@ -401,6 +442,19 @@ export function initSidebar(onChange, defaults = {}) {
   }
 
   return {
+    setMaterialCapabilities({ normal = true, roughness = true, ao = true }) {
+      if (!_matOpts) return;
+      const avail = { normal, roughness, ao };
+      let changed = false;
+      _matOpts.querySelectorAll('.sb-opt[data-val]').forEach(btn => {
+        const v = btn.dataset.val;
+        if (!(v in avail)) return;
+        btn.disabled = !avail[v];
+        if (!avail[v] && _matSet.has(v)) { _matSet.delete(v); changed = true; }
+      });
+      _matOpts.querySelectorAll('.sb-opt').forEach(b => b.classList.toggle('active', _matSet.has(b.dataset.val)));
+      if (changed) _matOnChange?.();
+    },
     updateMetrics(s) {
       grid.innerHTML =
         row('FPS avg',    s.avgFPS,    fpsClass(s.avgFPS)) +

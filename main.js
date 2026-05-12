@@ -57,7 +57,8 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "floorShadows") {
     navigateWithParam("floorShadow", option);
   } else if (categoryId === "fabrics") {
-    navigateWithParam("fabric", option);
+    setParam("fabric", option);
+    setFabricMode(option);
   } else if (categoryId === "envLighting") {
     navigateWithParam("envLight", option);
   } else if (categoryId === "anisotropy") {
@@ -70,7 +71,7 @@ const sidebar = initSidebar((categoryId, option) => {
   leather:      getParam("leather", "906700-81"),
   fabricCover:  getParam("fabricCover", null),
   wood:         getParam("wood", "HF Custom Bramble"),
-  fabrics:      getParam("fabric", "Full PBR"),
+  fabrics:      getParam("fabric", "fullpbr"),
   modelShadows: getParam("modelShadow", "Real-time"),
   floorShadows: getParam("floorShadow", "Contact"),
   envLighting:  getParam("envLight", "HDR map"),
@@ -251,12 +252,15 @@ function loadTexture(path) {
   });
 }
 
+function loadTextureOptional(path) {
+  return loadTexture(path).catch(() => null);
+}
+
 const SKU = "478-75";
 
-const _fabricAtLoad      = getParam("fabric", "Full PBR");
-const _needsNormal       = _fabricAtLoad === 'Full PBR' || _fabricAtLoad === 'Normal Map';
-const _needsAO           = _fabricAtLoad === 'Full PBR' || _fabricAtLoad === 'AO Map';
-const _needsBakedShadow  = _needsAO && getParam("floorShadow", "Contact") === 'Baked';
+const _needsNormal      = true;
+const _needsAO          = true;
+const _needsBakedShadow = getParam("floorShadow", "Contact") === 'Baked';
 
 const _bakeMode = getParam("fabricCover", null) ? 'fabric' : 'leather';
 
@@ -387,11 +391,13 @@ function setFabricMode(mode) {
   currentFabric = mode;
   if (!loadedModel) return;
 
+  const modes         = new Set(mode.split(','));
+  const fullPBR       = modes.has('fullpbr');
   const bakedShadow   = currentFloorShadow === 'Baked';
-  const showNormal    = mode === 'Full PBR' || mode === 'Normal Map';
-  const showRoughness = mode === 'Full PBR';
-  const showAO        = mode === 'Full PBR' || mode === 'AO Map';
-  const aoIntensity   = mode === 'AO Map' ? 4 : 1;
+  const showNormal    = fullPBR || modes.has('normal');
+  const showRoughness = fullPBR || modes.has('roughness');
+  const showAO        = fullPBR || modes.has('ao');
+  const aoIntensity   = showAO && !fullPBR ? 4 : 1;
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
@@ -524,7 +530,7 @@ let currentWood         = getParam("wood", "HF Custom Bramble");
 let currentFabricCover  = getParam("fabricCover", null);
 let currentTexExt       = getParam("texture", "jpg");
 let currentRes          = getParam("res", "2k");
-let currentFabric       = getParam("fabric", "Full PBR");
+let currentFabric       = getParam("fabric", "fullpbr");
 let currentModelShadow = getParam("modelShadow", "Real-time");
 let currentFloorShadow = getParam("floorShadow", "Contact");
 
@@ -586,13 +592,11 @@ let currentLeatherTex = null;
 let currentFabricTex  = null;
 
 async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
-  const base     = `/leathers/${sku}/${res}/${sku}`;
-  const needsNrm = currentFabric === 'Full PBR' || currentFabric === 'Normal Map';
-  const needsRgh = currentFabric === 'Full PBR';
+  const base = `/leathers/${sku}/${res}/${sku}`;
   const [map, normalMap, roughnessMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
-    needsNrm ? loadTexture(`${base}_normal.${ext}`)    : Promise.resolve(null),
-    needsRgh ? loadTexture(`${base}_roughness.${ext}`) : Promise.resolve(null),
+    loadTextureOptional(`${base}_normal.${ext}`),
+    loadTextureOptional(`${base}_roughness.${ext}`),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
@@ -648,16 +652,20 @@ async function applyLeather(sku) {
   });
 
   setFabricMode(currentFabric);
+  sidebar.setMaterialCapabilities({
+    normal:    tex.normalMap    !== null,
+    roughness: tex.roughnessMap !== null,
+    ao:        leatherBake.leatherAO !== null,
+  });
 }
 
 // --- Fabric cover texture switcher ---
 
 async function loadFabricTextures(sku, ext = "webp", res = "2k") {
-  const base    = `/fabrics/${sku}/${res}/${sku}`;
-  const needsNrm = currentFabric === 'Full PBR' || currentFabric === 'Normal Map';
+  const base = `/fabrics/${sku}/${res}/${sku}`;
   const [map, normalMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
-    needsNrm ? loadTexture(`${base}_normal.${ext}`) : Promise.resolve(null),
+    loadTextureOptional(`${base}_normal.${ext}`),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
@@ -709,6 +717,11 @@ async function applyFabricCover(sku) {
   });
 
   setFabricMode(currentFabric);
+  sidebar.setMaterialCapabilities({
+    normal:    tex.normalMap    !== null,
+    roughness: false,
+    ao:        fabricBake.leatherAO !== null,
+  });
 }
 
 // --- Wood texture switcher ---
@@ -716,13 +729,11 @@ async function applyFabricCover(sku) {
 let currentWoodTex = null;
 
 async function loadWoodTextures(name, ext = "jpg", res = "2k") {
-  const base     = `/wood/${name}/${res}/${name}`;
-  const needsNrm = currentFabric === 'Full PBR' || currentFabric === 'Normal Map';
-  const needsRgh = currentFabric === 'Full PBR';
+  const base = `/wood/${name}/${res}/${name}`;
   const [map, normalMap, roughnessMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
-    needsNrm ? loadTexture(`${base}_normal.${ext}`)    : Promise.resolve(null),
-    needsRgh ? loadTexture(`${base}_roughness.${ext}`) : Promise.resolve(null),
+    loadTextureOptional(`${base}_normal.${ext}`),
+    loadTextureOptional(`${base}_roughness.${ext}`),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
