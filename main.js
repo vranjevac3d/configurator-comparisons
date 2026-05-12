@@ -283,9 +283,11 @@ const aoBlendChunk = `
 #ifdef USE_AOMAP
 	float leatherAo = texture2D( aoMap,  vAoMapUv  ).r;
 	float shadowAo  = texture2D( aoMap2, vAoMap2Uv ).r;
+	float modelAo   = texture2D( aoMap3, vAoMap3Uv ).r;
 	float leatherOcclusion = ( leatherAo - 1.0 ) * aoMapIntensity + 1.0;
-	float ambientOcclusion = leatherOcclusion * shadowAo;
+	float ambientOcclusion = leatherOcclusion * shadowAo * modelAo;
 	reflectedLight.indirectDiffuse *= ambientOcclusion;
+	reflectedLight.directDiffuse   *= modelAo;
 	#if defined( USE_CLEARCOAT )
 		clearcoatSpecularIndirect *= ambientOcclusion;
 	#endif
@@ -329,18 +331,22 @@ function setupNormalBlend(mat, useUV1ForAO2 = false) {
   mat.onBeforeCompile = (shader) => {
     mat.userData.shader = shader;
     shader.uniforms.normalMap2 = { value: mat.userData.detailNormal || leatherBake.normalMap || neutralAO };
-    shader.uniforms.aoMap2     = { value: mat.userData.pendingAoMap2 || neutralAO };
+    shader.uniforms.aoMap2     = { value: mat.userData.pendingAoMap2    || neutralAO };
+    shader.uniforms.aoMap3     = { value: mat.userData.pendingModelShadow || neutralAO };
 
     shader.vertexShader = shader.vertexShader.replace(
       '#include <uv_pars_vertex>',
-      '#include <uv_pars_vertex>\nvarying vec2 vLeatherDetailUv;\nvarying vec2 vAoMap2Uv;'
+      '#include <uv_pars_vertex>\nvarying vec2 vLeatherDetailUv;\nvarying vec2 vAoMap2Uv;\nvarying vec2 vAoMap3Uv;'
     );
     const ao2UvAssign = useUV1ForAO2
       ? '#ifdef USE_UV1\nvAoMap2Uv = uv1;\n#else\nvAoMap2Uv = uv;\n#endif'
       : 'vAoMap2Uv = uv;';
+    const ao3UvAssign = useUV1ForAO2
+      ? '#ifdef USE_UV1\nvAoMap3Uv = uv1;\n#else\nvAoMap3Uv = uv;\n#endif'
+      : 'vAoMap3Uv = uv;';
     shader.vertexShader = shader.vertexShader.replace(
       '#include <uv_vertex>',
-      `#include <uv_vertex>\nvLeatherDetailUv = uv * 10.0;\n${ao2UvAssign}`
+      `#include <uv_vertex>\nvLeatherDetailUv = uv * 10.0;\n${ao2UvAssign}\n${ao3UvAssign}`
     );
 
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -349,7 +355,7 @@ function setupNormalBlend(mat, useUV1ForAO2 = false) {
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <aomap_pars_fragment>',
-      '#include <aomap_pars_fragment>\nuniform sampler2D aoMap2;\nvarying vec2 vAoMap2Uv;'
+      '#include <aomap_pars_fragment>\nuniform sampler2D aoMap2;\nvarying vec2 vAoMap2Uv;\nuniform sampler2D aoMap3;\nvarying vec2 vAoMap3Uv;'
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
@@ -424,6 +430,7 @@ function setFabricMode(mode) {
 
 function applyAllShadows() {
   const modelRT      = currentModelShadow === 'Real-time';
+  const modelBaked   = currentModelShadow === 'Baked';
   const floorContact = currentFloorShadow === 'Contact';
   const floorRT      = currentFloorShadow === 'Real-time';
   const floorBaked   = currentFloorShadow === 'Baked';
@@ -433,7 +440,15 @@ function applyAllShadows() {
   gtaoPass.enabled           = currentModelShadow === 'GTAO';
 
   if (loadedModel) loadedModel.traverse(n => {
-    if (n.isMesh) { n.castShadow = modelRT; n.receiveShadow = modelRT; }
+    if (!n.isMesh) return;
+    n.castShadow    = modelRT;
+    n.receiveShadow = modelRT;
+    const mat = n.material;
+    if (mat && materialWithBake(mat.name)) {
+      const ao3 = modelBaked && bakedModelShadowTex ? bakedModelShadowTex : neutralAO;
+      mat.userData.pendingModelShadow = ao3;
+      if (mat.userData.shader) mat.userData.shader.uniforms.aoMap3.value = ao3;
+    }
   });
 
   if (shadowGroup) shadowGroup.visible = floorContact;
@@ -500,9 +515,10 @@ function setAnisotropy(option) {
 const player = { model: null };
 window.player = player;
 
-let loadedModel = null;
-let floorMesh   = null;
-let rtFloor     = null;
+let loadedModel         = null;
+let floorMesh           = null;
+let rtFloor             = null;
+let bakedModelShadowTex = null;
 let currentLeather      = getParam("leather", "906700-81");
 let currentWood         = getParam("wood", "HF Custom Bramble");
 let currentFabricCover  = getParam("fabricCover", null);
@@ -824,7 +840,8 @@ async function loadAndSetupModel(path) {
       mat.userData.isArm             = isArm;
       mat.userData.fullPBR_normalMap = mat.normalMap;
       mat.userData.fullPBR_aoMap     = mat.aoMap;
-      mat.userData.pendingAoMap2     = neutralAO;
+      mat.userData.pendingAoMap2      = neutralAO;
+      mat.userData.pendingModelShadow = neutralAO;
       setupNormalBlend(mat, hasUV1);
       mat.needsUpdate = true;
     }
@@ -874,6 +891,10 @@ async function loadAndSetupModel(path) {
 
   contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
   updateContactShadow();
+
+  bakedModelShadowTex = currentModelShadow === 'Baked'
+    ? await loadTexture(`/${SKU}/Baked_Shadows.png`)
+    : null;
 
   if (currentFabricCover) {
     await applyFabricCover(currentFabricCover);

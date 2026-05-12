@@ -33,7 +33,7 @@ const CATEGORIES = [
   },
   {
     id: 'modelShadows', label: 'Model Shadows',
-    options: ['Real-time', 'GTAO', 'None'], default: 'Real-time',
+    options: ['Real-time', 'GTAO', 'Baked', 'None'], default: 'Real-time',
   },
   {
     id: 'floorShadows', label: 'Floor Shadows',
