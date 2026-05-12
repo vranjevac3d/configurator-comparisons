@@ -63,6 +63,8 @@ const sidebar = initSidebar((categoryId, option) => {
     navigateWithParam("envLight", option);
   } else if (categoryId === "anisotropy") {
     navigateWithParam("anisotropy", option);
+  } else if (categoryId === "pixelRatio") {
+    navigateWithParam("pixelRatio", option === "1x" ? "1" : "2");
   }
 }, {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
@@ -76,6 +78,7 @@ const sidebar = initSidebar((categoryId, option) => {
   floorShadows: getParam("floorShadow", "Contact"),
   envLighting:  getParam("envLight", "HDR map"),
   anisotropy:   getParam("anisotropy", "4x"),
+  pixelRatio:   getParam("pixelRatio", "2") === "1" ? "1x" : "2x",
 });
 
 // --- Renderer ---
@@ -83,7 +86,7 @@ const sidebar = initSidebar((categoryId, option) => {
 const viewport = document.getElementById("viewport");
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(getParam("pixelRatio", "2") === "1" ? 1 : 2);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;

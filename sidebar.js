@@ -37,6 +37,10 @@ const CATEGORIES = [
     options: ['Contact', 'Real-time', 'Baked', 'None'], default: 'Contact',
   },
   {
+    id: 'pixelRatio', label: 'Pixel Ratio',
+    options: ['1x', '2x'], default: '2x',
+  },
+  {
     id: 'anisotropy', label: 'Anisotropy',
     options: ['1x', '2x', '4x', '8x', 'MAX'], default: '4x',
   },
