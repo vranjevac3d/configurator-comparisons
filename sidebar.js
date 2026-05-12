@@ -25,10 +25,6 @@ const CATEGORIES = [
     options: ['Draco', 'MeshOpt', 'None'], default: 'Draco',
   },
   {
-    id: 'lod', label: 'LOD',
-    options: ['Static high-res', 'Dynamic LOD'], default: 'Static high-res',
-  },
-  {
     id: 'envLighting', label: 'Env Lighting',
     options: ['HDR map', 'Flat ambient', 'Baked lightmaps'], default: 'HDR map',
   },
@@ -39,10 +35,6 @@ const CATEGORIES = [
   {
     id: 'floorShadows', label: 'Floor Shadows',
     options: ['Contact', 'Real-time', 'Baked', 'None'], default: 'Contact',
-  },
-  {
-    id: 'renderer', label: 'Renderer',
-    options: ['WebGL2', 'WebGPU'], default: 'WebGL2',
   },
   {
     id: 'anisotropy', label: 'Anisotropy',
@@ -97,7 +89,7 @@ export function initSidebar(onChange, defaults = {}) {
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
 
-  const WIP_IDS = new Set(['modelComplexity', 'format', 'lod', 'drawCallBatching', 'textureFiles', 'renderer']);
+  const WIP_IDS = new Set(['modelComplexity', 'format', 'drawCallBatching', 'textureFiles']);
   const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'compression:MeshOpt']);
 
   CATEGORIES.forEach((cat) => {
