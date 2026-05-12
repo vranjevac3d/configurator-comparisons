@@ -652,12 +652,12 @@ async function applyLeather(sku) {
 
 // --- Fabric cover texture switcher ---
 
-async function loadFabricTextures(sku) {
-  const base    = `/fabrics/${sku}/${sku}`;
+async function loadFabricTextures(sku, ext = "webp", res = "2k") {
+  const base    = `/fabrics/${sku}/${res}/${sku}`;
   const needsNrm = currentFabric === 'Full PBR' || currentFabric === 'Normal Map';
   const [map, normalMap] = await Promise.all([
-    loadTexture(`${base}.webp`),
-    needsNrm ? loadTexture(`${base}_normal.jpg`) : Promise.resolve(null),
+    loadTexture(`${base}.${ext}`),
+    needsNrm ? loadTexture(`${base}_normal.${ext}`) : Promise.resolve(null),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
@@ -668,7 +668,7 @@ async function loadFabricTextures(sku) {
 async function applyFabricCover(sku) {
   currentFabricCover = sku;
   if (!loadedModel) return;
-  const tex = await loadFabricTextures(sku);
+  const tex = await loadFabricTextures(sku, currentTexExt, currentRes);
   if (currentFabricTex) {
     currentFabricTex.map.dispose();
     currentFabricTex.normalMap?.dispose();
