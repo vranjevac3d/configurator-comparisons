@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
@@ -39,7 +40,7 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "resolution") {
     navigateWithParam("res", { "2K": "2k", "1K": "1k", "512px": "512" }[option]);
   } else if (categoryId === "format") {
-    navigateWithParam("format", option === "GLB" ? "glb" : "gltf");
+    navigateWithParam("format", { GLB: "glb", gITF: "gltf", FBX: "fbx" }[option]);
   } else if (categoryId === "compression") {
     navigateWithParam("compression", { Draco: "draco", None: "none" }[option]);
   } else if (categoryId === "fabricCover") {
@@ -71,7 +72,7 @@ const sidebar = initSidebar((categoryId, option) => {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
   resolution:  { "2k": "2K", "1k": "1K", "512": "512px" }[getParam("res", "2k")]                    ?? "2K",
   compression: { draco: "Draco", none: "None" }[getParam("compression", "draco")]                     ?? "Draco",
-  format:      { glb: "GLB", gltf: "gITF" }[getParam("format", "gltf")]                               ?? "gITF",
+  format:      { glb: "GLB", gltf: "gITF", fbx: "FBX" }[getParam("format", "gltf")]                   ?? "gITF",
   leather:      getParam("leather", "906700-81"),
   fabricCover:  getParam("fabricCover", null),
   wood:         getParam("wood", "HF Custom Bramble"),
@@ -782,6 +783,8 @@ dracoLoader.setDecoderPath("/draco/");
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
 
+const fbxLoader = new FBXLoader();
+
 const modelCache = {};
 
 function cloneScene(source) {
@@ -818,9 +821,13 @@ async function loadAndSetupModel(path) {
   }
 
   if (!modelCache[path]) {
-    modelCache[path] = await new Promise((resolve, reject) =>
-      gltfLoader.load(path, resolve, undefined, reject)
-    );
+    modelCache[path] = await new Promise((resolve, reject) => {
+      if (path.endsWith('.fbx')) {
+        fbxLoader.load(path, (fbx) => resolve({ scene: fbx }), undefined, reject);
+      } else {
+        gltfLoader.load(path, resolve, undefined, reject);
+      }
+    });
   }
 
   metrics.markLoadEnd();
@@ -930,10 +937,14 @@ async function loadAndSetupModel(path) {
   metrics.markModelLoaded();
 }
 
+const _fmt     = getParam("format", "gltf");
+const _noComp  = getParam("compression", "draco") === "none";
 await loadAndSetupModel(
-  getParam("compression", "draco") === "none"
-    ? `/${SKU}/${SKU}-no-compression.${getParam("format", "gltf") === "glb" ? "glb" : "gltf"}`
-    : `/${SKU}/${SKU}.${getParam("format", "gltf") === "glb" ? "glb" : "gltf"}`
+  _fmt === "fbx"
+    ? `/${SKU}/${SKU}.fbx`
+    : _noComp
+      ? `/${SKU}/${SKU}-no-compression.${_fmt}`
+      : `/${SKU}/${SKU}.${_fmt}`
 );
 
 // --- Resize ---
