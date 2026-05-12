@@ -860,7 +860,7 @@ async function loadAndSetupModel(path) {
     new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
   );
   floorMesh.rotation.x = -Math.PI / 2;
-  floorMesh.position.y = -size.y / 2;
+  floorMesh.position.set(-center.x, -size.y / 2, -center.z);
   scene.add(floorMesh);
 
   rtFloor = new THREE.Mesh(
