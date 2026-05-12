@@ -38,6 +38,8 @@ const sidebar = initSidebar((categoryId, option) => {
     navigateWithParam("texture", { JPG: "jpg", WebP: "webp", KTX2: "ktx2", AVIF: "avif" }[option]);
   } else if (categoryId === "resolution") {
     navigateWithParam("res", { "2K": "2k", "1K": "1k", "512px": "512" }[option]);
+  } else if (categoryId === "format") {
+    navigateWithParam("format", option === "GLB" ? "glb" : "gltf");
   } else if (categoryId === "compression") {
     navigateWithParam("compression", { Draco: "draco", None: "none" }[option]);
   } else if (categoryId === "fabricCover") {
@@ -69,6 +71,7 @@ const sidebar = initSidebar((categoryId, option) => {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
   resolution:  { "2k": "2K", "1k": "1K", "512": "512px" }[getParam("res", "2k")]                    ?? "2K",
   compression: { draco: "Draco", none: "None" }[getParam("compression", "draco")]                     ?? "Draco",
+  format:      { glb: "GLB", gltf: "gITF" }[getParam("format", "gltf")]                               ?? "gITF",
   leather:      getParam("leather", "906700-81"),
   fabricCover:  getParam("fabricCover", null),
   wood:         getParam("wood", "HF Custom Bramble"),
@@ -929,8 +932,8 @@ async function loadAndSetupModel(path) {
 
 await loadAndSetupModel(
   getParam("compression", "draco") === "none"
-    ? `/${SKU}/${SKU}-no-compression.gltf`
-    : `/${SKU}/${SKU}.gltf`
+    ? `/${SKU}/${SKU}-no-compression.${getParam("format", "gltf") === "glb" ? "glb" : "gltf"}`
+    : `/${SKU}/${SKU}.${getParam("format", "gltf") === "glb" ? "glb" : "gltf"}`
 );
 
 // --- Resize ---

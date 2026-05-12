@@ -18,7 +18,7 @@ const CATEGORIES = [
   },
   {
     id: 'format', label: '3D Format',
-    options: ['GLB', 'gITF', 'FBX', 'OBJ', 'USDZ'], default: 'GLB',
+    options: ['GLB', 'gITF', 'FBX', 'OBJ', 'USDZ'], default: 'gITF',
   },
   {
     id: 'compression', label: 'Compression',
@@ -93,8 +93,8 @@ export function initSidebar(onChange, defaults = {}) {
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
 
-  const WIP_IDS = new Set(['modelComplexity', 'format', 'drawCallBatching', 'textureFiles']);
-  const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'compression:MeshOpt']);
+  const WIP_IDS = new Set(['modelComplexity', 'drawCallBatching', 'textureFiles']);
+  const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'compression:MeshOpt', 'format:FBX', 'format:OBJ', 'format:USDZ']);
 
   CATEGORIES.forEach((cat) => {
     const row = document.createElement('div');
