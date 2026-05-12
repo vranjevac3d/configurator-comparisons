@@ -18,8 +18,9 @@ export function contactShadow(model, scene, floorPlane, shadowGroup, renderTarge
   const bbox = new Box3().setFromObject(model);
 
   const SHADOW_OFFSET = 5;
-  const WIDTH = bbox.getSize(new Vector3()).x * SHADOW_OFFSET;
-  const CAMERA_HEIGHT = bbox.max.y;
+  const size = bbox.getSize(new Vector3());
+  const WIDTH = size.x * SHADOW_OFFSET;
+  const CAMERA_HEIGHT = size.y;
   const OPACITY = 0.5;
 
   const geometry = new PlaneGeometry(WIDTH, WIDTH).rotateX(Math.PI / 2);
@@ -49,6 +50,7 @@ export function contactShadow(model, scene, floorPlane, shadowGroup, renderTarge
   camera.bottom = -WIDTH / 2;
   camera.near = 0;
   camera.far = CAMERA_HEIGHT;
+  camera.position.y = bbox.min.y;
   camera.rotation.x = Math.PI / 2;
   camera.updateProjectionMatrix();
 

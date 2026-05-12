@@ -242,7 +242,7 @@ function loadTexture(path) {
   });
 }
 
-const SKU = "641-25";
+const SKU = "478-75";
 
 const _fabricAtLoad      = getParam("fabric", "Full PBR");
 const _needsNormal       = _fabricAtLoad === 'Full PBR' || _fabricAtLoad === 'Normal Map';
@@ -251,7 +251,7 @@ const _needsBakedShadow  = _needsAO && getParam("floorShadow", "Contact") === 'B
 
 const leatherBake = {
   normalMap: _needsNormal      ? await loadTexture(`/${SKU}/${SKU}_LEATHER_Normal.jpg`) : null,
-  aoMap:     _needsBakedShadow ? await loadTexture(`/${SKU}/Baked_Shadows.png`)         : null,
+  aoMap:     _needsBakedShadow ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)      : null,
   leatherAO: _needsAO          ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)     : null,
 };
 
@@ -749,7 +749,7 @@ async function loadAndSetupModel(path) {
     });
   }
 
-  const floorTex = await loadTexture(`/${SKU}/Floor.png`);
+  const floorTex = await loadTexture(`/Floor.png`);
   floorTex.flipY = true;
   floorMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(2, 2),
