@@ -94,7 +94,7 @@ export function initSidebar(onChange, defaults = {}) {
   configEl.className = 'sb-config';
 
   const WIP_IDS = new Set(['modelComplexity', 'drawCallBatching', 'textureFiles']);
-  const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'compression:MeshOpt', 'format:OBJ', 'format:USDZ']);
+  const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'compression:MeshOpt', 'format:USDZ']);
 
   CATEGORIES.forEach((cat) => {
     const row = document.createElement('div');
