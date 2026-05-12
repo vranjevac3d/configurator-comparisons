@@ -40,8 +40,16 @@ const sidebar = initSidebar((categoryId, option) => {
     navigateWithParam("res", { "2K": "2k", "1K": "1k", "512px": "512" }[option]);
   } else if (categoryId === "compression") {
     navigateWithParam("compression", { Draco: "draco", None: "none" }[option]);
+  } else if (categoryId === "fabricCover") {
+    const p = new URLSearchParams(location.search);
+    p.set("fabricCover", option);
+    p.delete("leather");
+    location.href = `?${p}`;
   } else if (categoryId === "leather") {
-    navigateWithParam("leather", option);
+    const p = new URLSearchParams(location.search);
+    p.set("leather", option);
+    p.delete("fabricCover");
+    location.href = `?${p}`;
   } else if (categoryId === "wood") {
     navigateWithParam("wood", option);
   } else if (categoryId === "modelShadows") {
@@ -60,6 +68,7 @@ const sidebar = initSidebar((categoryId, option) => {
   resolution:  { "2k": "2K", "1k": "1K", "512": "512px" }[getParam("res", "2k")]                    ?? "2K",
   compression: { draco: "Draco", none: "None" }[getParam("compression", "draco")]                     ?? "Draco",
   leather:      getParam("leather", "906700-81"),
+  fabricCover:  getParam("fabricCover", null),
   wood:         getParam("wood", "HF Custom Bramble"),
   fabrics:      getParam("fabric", "Full PBR"),
   modelShadows: getParam("modelShadow", "Real-time"),
@@ -249,11 +258,20 @@ const _needsNormal       = _fabricAtLoad === 'Full PBR' || _fabricAtLoad === 'No
 const _needsAO           = _fabricAtLoad === 'Full PBR' || _fabricAtLoad === 'AO Map';
 const _needsBakedShadow  = _needsAO && getParam("floorShadow", "Contact") === 'Baked';
 
+const _bakeMode = getParam("fabricCover", null) ? 'fabric' : 'leather';
+
 const leatherBake = {
-  normalMap: _needsNormal      ? await loadTexture(`/${SKU}/${SKU}_LEATHER_Normal.jpg`) : null,
-  aoMap:     _needsBakedShadow ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)      : null,
-  leatherAO: _needsAO          ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)     : null,
+  normalMap: (_needsNormal      && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/${SKU}_LEATHER_Normal.jpg`) : null,
+  aoMap:     (_needsBakedShadow && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)      : null,
+  leatherAO: (_needsAO          && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)     : null,
 };
+
+const fabricBake = {
+  normalMap: (_needsNormal      && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/${SKU}_FABRIC_Normal.jpg`) : null,
+  aoMap:     (_needsBakedShadow && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/${SKU}_FABRIC_AO.jpg`)      : null,
+  leatherAO: (_needsAO          && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/${SKU}_FABRIC_AO.jpg`)     : null,
+};
+
 
 // --- Normal-blend shader (baked large-scale + tiling detail, like pwa) ---
 
@@ -342,6 +360,19 @@ function setupNormalBlend(mat, useUV1ForAO2 = false) {
       aoBlendChunk
     );
   };
+}
+
+function swapBake(mat, bake) {
+  if (mat.userData.hasUV1) {
+    if (bake.normalMap) { const n = bake.normalMap.clone(); n.channel = 1; mat.normalMap = n; }
+    if (bake.leatherAO) { const ao = bake.leatherAO.clone(); ao.channel = 1; mat.aoMap = ao; }
+  } else {
+    mat.normalMap = bake.normalMap;
+    mat.aoMap     = bake.leatherAO;
+  }
+  if (!mat.userData.isArm && bake.aoMap) mat.userData.bakedShadowsAO = bake.aoMap;
+  mat.userData.fullPBR_normalMap = mat.normalMap;
+  mat.userData.fullPBR_aoMap     = mat.aoMap;
 }
 
 // --- Fabric mode ---
@@ -458,7 +489,9 @@ function setAnisotropy(option) {
   }
 
   [leatherBake.normalMap, leatherBake.aoMap, leatherBake.leatherAO].forEach(applyTo);
+  [fabricBake.normalMap, fabricBake.aoMap, fabricBake.leatherAO].forEach(applyTo);
   if (currentLeatherTex) [currentLeatherTex.map, currentLeatherTex.normalMap, currentLeatherTex.roughnessMap].forEach(applyTo);
+  if (currentFabricTex)  [currentFabricTex.map, currentFabricTex.normalMap].forEach(applyTo);
   if (currentWoodTex) [currentWoodTex.map, currentWoodTex.normalMap, currentWoodTex.roughnessMap].forEach(applyTo);
 }
 
@@ -470,11 +503,12 @@ window.player = player;
 let loadedModel = null;
 let floorMesh   = null;
 let rtFloor     = null;
-let currentLeather = getParam("leather", "906700-81");
-let currentWood    = getParam("wood", "HF Custom Bramble");
-let currentTexExt  = getParam("texture", "jpg");
-let currentRes     = getParam("res", "2k");
-let currentFabric      = getParam("fabric", "Full PBR");
+let currentLeather      = getParam("leather", "906700-81");
+let currentWood         = getParam("wood", "HF Custom Bramble");
+let currentFabricCover  = getParam("fabricCover", null);
+let currentTexExt       = getParam("texture", "jpg");
+let currentRes          = getParam("res", "2k");
+let currentFabric       = getParam("fabric", "Full PBR");
 let currentModelShadow = getParam("modelShadow", "Real-time");
 let currentFloorShadow = getParam("floorShadow", "Contact");
 
@@ -533,6 +567,7 @@ function updateContactShadow() {
 // --- Leather texture switcher ---
 
 let currentLeatherTex = null;
+let currentFabricTex  = null;
 
 async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
   const base     = `/leathers/${sku}/${res}/${sku}`;
@@ -560,6 +595,11 @@ async function applyLeather(sku) {
     currentLeatherTex.roughnessMap?.dispose();
   }
   currentLeatherTex = tex;
+  if (currentFabricTex) {
+    currentFabricTex.map.dispose();
+    currentFabricTex.normalMap?.dispose();
+    currentFabricTex = null;
+  }
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
@@ -575,6 +615,7 @@ async function applyLeather(sku) {
     mat.needsUpdate  = true;
 
     if (isBake) {
+      swapBake(mat, leatherBake);
       mat.userData.detailNormal         = tex.normalMap;
       mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
       if (mat.userData.shader) {
@@ -587,6 +628,67 @@ async function applyLeather(sku) {
       mat.userData.fullPBR_normalMap    = tex.normalMap;
       mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
       mat.needsUpdate                   = true;
+    }
+  });
+
+  setFabricMode(currentFabric);
+}
+
+// --- Fabric cover texture switcher ---
+
+async function loadFabricTextures(sku) {
+  const base    = `/fabrics/${sku}/${sku}`;
+  const needsNrm = currentFabric === 'Full PBR' || currentFabric === 'Normal Map';
+  const [map, normalMap] = await Promise.all([
+    loadTexture(`${base}.webp`),
+    needsNrm ? loadTexture(`${base}_normal.jpg`) : Promise.resolve(null),
+  ]);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.repeat.set(10, 10);
+  if (normalMap) normalMap.repeat.set(10, 10);
+  return { map, normalMap, roughnessMap: null };
+}
+
+async function applyFabricCover(sku) {
+  currentFabricCover = sku;
+  if (!loadedModel) return;
+  const tex = await loadFabricTextures(sku);
+  if (currentFabricTex) {
+    currentFabricTex.map.dispose();
+    currentFabricTex.normalMap?.dispose();
+  }
+  currentFabricTex = tex;
+  if (currentLeatherTex) {
+    currentLeatherTex.map.dispose();
+    currentLeatherTex.normalMap?.dispose();
+    currentLeatherTex.roughnessMap?.dispose();
+    currentLeatherTex = null;
+  }
+
+  loadedModel.traverse((node) => {
+    if (!node.isMesh) return;
+    const mat = node.material;
+    if (!mat) return;
+
+    const isBake = materialWithBake(mat.name);
+    const isWelt = !isBake && mat.name.includes('welt');
+    if (!isBake && !isWelt) return;
+
+    mat.map          = tex.map;
+    mat.roughnessMap = null;
+    mat.needsUpdate  = true;
+
+    if (isBake) {
+      swapBake(mat, fabricBake);
+      mat.userData.detailNormal         = tex.normalMap;
+      mat.userData.fullPBR_roughnessMap = null;
+      if (mat.userData.shader) {
+        mat.userData.shader.uniforms.normalMap2.value = tex.normalMap || fabricBake.normalMap || neutralAO;
+      }
+    } else {
+      mat.normalMap                     = tex.normalMap ?? null;
+      mat.userData.fullPBR_normalMap    = tex.normalMap;
+      mat.userData.fullPBR_roughnessMap = null;
     }
   });
 
@@ -708,16 +810,18 @@ async function loadAndSetupModel(path) {
       const isFallback = materialFallbacksOnMain(mat.name);
       const hasUV1     = isFallback && !!node.geometry.attributes.uv1;
       const isArm      = mat.name === 'arm' || mat.name.startsWith('arm_');
-
+      const initBake = _bakeMode === 'fabric' ? fabricBake : leatherBake;
       if (hasUV1) {
-        if (leatherBake.normalMap) { const n = leatherBake.normalMap.clone(); n.channel = 1; mat.normalMap = n; }
-        if (leatherBake.leatherAO) { const ao = leatherBake.leatherAO.clone(); ao.channel = 1; mat.aoMap = ao; }
+        if (initBake.normalMap) { const n = initBake.normalMap.clone(); n.channel = 1; mat.normalMap = n; }
+        if (initBake.leatherAO) { const ao = initBake.leatherAO.clone(); ao.channel = 1; mat.aoMap = ao; }
       } else {
-        mat.normalMap = leatherBake.normalMap;
-        mat.aoMap     = leatherBake.leatherAO;
+        mat.normalMap = initBake.normalMap;
+        mat.aoMap     = initBake.leatherAO;
       }
-      if (!isArm && leatherBake.aoMap) mat.userData.bakedShadowsAO = leatherBake.aoMap;
+      if (!isArm && initBake.aoMap) mat.userData.bakedShadowsAO = initBake.aoMap;
 
+      mat.userData.hasUV1            = hasUV1;
+      mat.userData.isArm             = isArm;
       mat.userData.fullPBR_normalMap = mat.normalMap;
       mat.userData.fullPBR_aoMap     = mat.aoMap;
       mat.userData.pendingAoMap2     = neutralAO;
@@ -771,7 +875,11 @@ async function loadAndSetupModel(path) {
   contactShadow(model, scene, null, shadowGroup, renderTarget, shadowCamera);
   updateContactShadow();
 
-  await applyLeather(currentLeather);
+  if (currentFabricCover) {
+    await applyFabricCover(currentFabricCover);
+  } else {
+    await applyLeather(currentLeather);
+  }
   await applyWood(currentWood);
   applyAllShadows();
   setAnisotropy(getParam("anisotropy", "4x"));

@@ -63,11 +63,14 @@ const WOODS = [
   'HF Custom Java',
 ];
 
+const FABRICS = [
+  'HD40000-19', 'HD40000-29', 'HD40000-38',
+  'HD40000-47', 'HD40000-49', 'HD40000-60',
+];
+
 const LEATHERS = [
-  '901200-87',
-  '901200-48', '901200-99',
-  '906700-45', '906700-81', '906700-84', '906700-88', '906700-97',
-  '907200-45',
+  '901200-87', '901200-48', '901200-99',
+  '906700-45', '906700-81', '906700-84',
 ];
 
 export function initSidebar(onChange, defaults = {}) {
@@ -131,6 +134,46 @@ export function initSidebar(onChange, defaults = {}) {
     row.appendChild(opts);
     configEl.appendChild(row);
   });
+
+  // Fabric swatch picker
+  const fabricRow = document.createElement('div');
+  fabricRow.className = 'sb-row';
+
+  const fabricLabel = document.createElement('div');
+  fabricLabel.className = 'sb-row-label';
+  fabricLabel.textContent = 'Fabric';
+  fabricRow.appendChild(fabricLabel);
+
+  const fabricGrid = document.createElement('div');
+  fabricGrid.className = 'sb-swatches';
+
+  let activeFabricBtn = null;
+
+  FABRICS.forEach((sku, i) => {
+    const btn = document.createElement('button');
+    const isDefault = sku === defaults.fabricCover;
+    btn.className = 'sb-swatch' + (isDefault ? ' active' : '');
+    btn.title = sku;
+
+    const img = document.createElement('img');
+    img.src = `/fabrics/${sku}/${sku}_icon.webp`;
+    img.alt = sku;
+    btn.appendChild(img);
+
+    if (isDefault) activeFabricBtn = btn;
+
+    btn.addEventListener('click', () => {
+      if (activeFabricBtn) activeFabricBtn.classList.remove('active');
+      btn.classList.add('active');
+      activeFabricBtn = btn;
+      onChange?.('fabricCover', sku);
+    });
+
+    fabricGrid.appendChild(btn);
+  });
+
+  fabricRow.appendChild(fabricGrid);
+  configEl.appendChild(fabricRow);
 
   // Leather swatch picker
   const leatherRow = document.createElement('div');
