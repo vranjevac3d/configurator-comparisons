@@ -57,8 +57,7 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "floorShadows") {
     navigateWithParam("floorShadow", option);
   } else if (categoryId === "fabrics") {
-    setParam("fabric", option);
-    setFabricMode(option);
+    navigateWithParam("fabric", option);
   } else if (categoryId === "envLighting") {
     navigateWithParam("envLight", option);
   } else if (categoryId === "anisotropy") {
@@ -594,12 +593,14 @@ function updateContactShadow() {
 let currentLeatherTex = null;
 let currentFabricTex  = null;
 
-async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
+async function loadLeatherTextures(sku, ext = "jpg", res = "2k", modes = new Set(['fullpbr'])) {
   const base = `/leathers/${sku}/${res}/${sku}`;
+  const wantNormal    = modes.has('fullpbr') || modes.has('normal');
+  const wantRoughness = modes.has('fullpbr') || modes.has('roughness');
   const [map, normalMap, roughnessMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
-    loadTextureOptional(`${base}_normal.${ext}`),
-    loadTextureOptional(`${base}_roughness.${ext}`),
+    wantNormal    ? loadTextureOptional(`${base}_normal.${ext}`)    : Promise.resolve(null),
+    wantRoughness ? loadTextureOptional(`${base}_roughness.${ext}`) : Promise.resolve(null),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
@@ -611,7 +612,7 @@ async function loadLeatherTextures(sku, ext = "jpg", res = "2k") {
 async function applyLeather(sku) {
   currentLeather = sku;
   if (!loadedModel) return;
-  const tex = await loadLeatherTextures(sku, currentTexExt, currentRes);
+  const tex = await loadLeatherTextures(sku, currentTexExt, currentRes, new Set(currentFabric.split(',')));
   if (currentLeatherTex) {
     currentLeatherTex.map.dispose();
     currentLeatherTex.normalMap?.dispose();
@@ -664,11 +665,12 @@ async function applyLeather(sku) {
 
 // --- Fabric cover texture switcher ---
 
-async function loadFabricTextures(sku, ext = "webp", res = "2k") {
+async function loadFabricTextures(sku, ext = "webp", res = "2k", modes = new Set(['fullpbr'])) {
   const base = `/fabrics/${sku}/${res}/${sku}`;
+  const wantNormal = modes.has('fullpbr') || modes.has('normal');
   const [map, normalMap] = await Promise.all([
     loadTexture(`${base}.${ext}`),
-    loadTextureOptional(`${base}_normal.${ext}`),
+    wantNormal ? loadTextureOptional(`${base}_normal.${ext}`) : Promise.resolve(null),
   ]);
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(10, 10);
@@ -679,7 +681,7 @@ async function loadFabricTextures(sku, ext = "webp", res = "2k") {
 async function applyFabricCover(sku) {
   currentFabricCover = sku;
   if (!loadedModel) return;
-  const tex = await loadFabricTextures(sku, currentTexExt, currentRes);
+  const tex = await loadFabricTextures(sku, currentTexExt, currentRes, new Set(currentFabric.split(',')));
   if (currentFabricTex) {
     currentFabricTex.map.dispose();
     currentFabricTex.normalMap?.dispose();
@@ -884,15 +886,17 @@ async function loadAndSetupModel(path) {
     });
   }
 
-  const floorTex = await loadTexture(`/Floor.png`);
-  floorTex.flipY = true;
-  floorMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
-  );
-  floorMesh.rotation.x = -Math.PI / 2;
-  floorMesh.position.set(-center.x, -size.y / 2, -center.z);
-  scene.add(floorMesh);
+  if (getParam("floorShadow", "Contact") === 'Baked') {
+    const floorTex = await loadTexture(`/Floor.png`);
+    floorTex.flipY = true;
+    floorMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.MultiplyBlending, depthWrite: false })
+    );
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.set(-center.x, -size.y / 2, -center.z);
+    scene.add(floorMesh);
+  }
 
   rtFloor = new THREE.Mesh(
     new THREE.PlaneGeometry(size.x * 4, size.z * 4),
