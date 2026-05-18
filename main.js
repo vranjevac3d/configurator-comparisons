@@ -117,7 +117,17 @@ camera.position.set(0, 2, 5);
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
-const gtaoPass = new GTAOPass(scene, camera, 1, 1);
+class GTAOPassNoFloor extends GTAOPass {
+  render(renderer, writeBuffer, readBuffer, deltaTime, maskActive) {
+    const floors = [rtFloor, floorMesh, shadowGroup].filter(Boolean);
+    const prev = floors.map(o => o.visible);
+    floors.forEach(o => { o.visible = false; });
+    super.render(renderer, writeBuffer, readBuffer, deltaTime, maskActive);
+    floors.forEach((o, i) => { o.visible = prev[i]; });
+  }
+}
+
+const gtaoPass = new GTAOPassNoFloor(scene, camera, 1, 1);
 gtaoPass.output = GTAOPass.OUTPUT.Default;
 gtaoPass.blendIntensity = 1.0;
 gtaoPass.radius = 0.3;
