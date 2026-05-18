@@ -22,7 +22,7 @@ const CATEGORIES = [
   },
   {
     id: 'compression', label: 'Compression',
-    options: ['Draco', 'MeshOpt', 'None'], default: 'Draco',
+    options: ['Draco', 'None'], default: 'Draco',
   },
   {
     id: 'envLighting', label: 'Env Lighting',
@@ -94,7 +94,7 @@ export function initSidebar(onChange, defaults = {}) {
   configEl.className = 'sb-config';
 
   const WIP_IDS = new Set(['modelComplexity', 'drawCallBatching', 'textureFiles']);
-  const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'compression:MeshOpt', 'format:USDZ']);
+  const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'format:USDZ']);
 
   CATEGORIES.forEach((cat) => {
     const row = document.createElement('div');
