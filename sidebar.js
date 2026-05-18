@@ -26,7 +26,7 @@ const CATEGORIES = [
   },
   {
     id: 'envLighting', label: 'Env Lighting',
-    options: ['HDR map', 'Flat ambient', 'Baked lightmaps'], default: 'HDR map',
+    options: ['HDR map', 'Flat ambient'], default: 'HDR map',
   },
   {
     id: 'modelShadows', label: 'Model Shadows',
@@ -94,7 +94,7 @@ export function initSidebar(onChange, defaults = {}) {
   configEl.className = 'sb-config';
 
   const WIP_IDS = new Set(['modelComplexity', 'drawCallBatching', 'textureFiles']);
-  const WIP_OPTS = new Set(['envLighting:Baked lightmaps', 'format:USDZ']);
+  const WIP_OPTS = new Set(['format:USDZ']);
 
   CATEGORIES.forEach((cat) => {
     const row = document.createElement('div');
