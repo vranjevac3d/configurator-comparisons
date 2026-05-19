@@ -468,7 +468,7 @@ body {
 
 /* ── OBJ-locked complexity buttons ───────────────────── */
 
-.sb-opt-obj-locked {
+.sb-opt-locked {
   opacity: 0.3;
   cursor: not-allowed;
 }

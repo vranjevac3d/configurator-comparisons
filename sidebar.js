@@ -127,6 +127,7 @@ export function initSidebar(onChange, defaults = {}) {
   let _fabricsRow = null;
   let _meshStructureRow = null;
   let _complexityBtns = [];
+  let _compressionBtns = [];
 
   // Config tab header
   const configHeader = document.createElement('div');
@@ -138,14 +139,13 @@ export function initSidebar(onChange, defaults = {}) {
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
 
-  const _objTooltip = document.createElement('div');
-  _objTooltip.className = 'sb-cursor-tooltip';
-  _objTooltip.textContent = 'OBJ does not support multiple UV sets';
-  document.body.appendChild(_objTooltip);
+  const _lockTooltip = document.createElement('div');
+  _lockTooltip.className = 'sb-cursor-tooltip';
+  document.body.appendChild(_lockTooltip);
 
   document.addEventListener('mousemove', (e) => {
-    _objTooltip.style.left = `${e.clientX + 14}px`;
-    _objTooltip.style.top  = `${e.clientY - 10}px`;
+    _lockTooltip.style.left = `${e.clientX + 14}px`;
+    _lockTooltip.style.top  = `${e.clientY - 10}px`;
   });
 
   const WIP_IDS = new Set(['textureFiles']);
@@ -216,13 +216,24 @@ export function initSidebar(onChange, defaults = {}) {
         if (cat.id === 'modelComplexity') {
           _complexityBtns.push({ btn, opt });
           btn.addEventListener('mouseenter', () => {
-            if (btn.classList.contains('sb-opt-obj-locked')) _objTooltip.classList.add('visible');
+            if (!btn.classList.contains('sb-opt-locked')) return;
+            _lockTooltip.textContent = 'OBJ does not support multiple UV sets';
+            _lockTooltip.classList.add('visible');
           });
-          btn.addEventListener('mouseleave', () => _objTooltip.classList.remove('visible'));
+          btn.addEventListener('mouseleave', () => _lockTooltip.classList.remove('visible'));
+        }
+        if (cat.id === 'compression') {
+          _compressionBtns.push({ btn, opt });
+          btn.addEventListener('mouseenter', () => {
+            if (!btn.classList.contains('sb-opt-locked')) return;
+            _lockTooltip.textContent = 'Draco compression is only available for GLB and GLTF';
+            _lockTooltip.classList.add('visible');
+          });
+          btn.addEventListener('mouseleave', () => _lockTooltip.classList.remove('visible'));
         }
         if (!wip && !wipOpt) {
           btn.addEventListener('click', () => {
-            if (btn.classList.contains('sb-opt-obj-locked')) return;
+            if (btn.classList.contains('sb-opt-locked')) return;
             opts.querySelectorAll('.sb-opt').forEach((b) => b.classList.remove('active'));
             btn.classList.add('active');
             onChange?.(cat.id, opt);
@@ -236,16 +247,30 @@ export function initSidebar(onChange, defaults = {}) {
     configEl.appendChild(row);
   });
 
+  const DRACO_FORMATS = new Set(['GLB', 'gITF']);
+
   function applyObjConstraint(isObj) {
     _complexityBtns.forEach(({ btn, opt }) => {
-      btn.classList.toggle('sb-opt-obj-locked', isObj && opt !== 'High poly');
+      btn.classList.toggle('sb-opt-locked', isObj && opt !== 'High poly');
     });
     if (isObj) {
       _complexityBtns.forEach(({ btn, opt }) => btn.classList.toggle('active', opt === 'High poly'));
     }
   }
 
-  if ((defaults.format ?? 'gITF') === 'OBJ') applyObjConstraint(true);
+  function applyCompressionConstraint(format) {
+    const locked = !DRACO_FORMATS.has(format);
+    _compressionBtns.forEach(({ btn, opt }) => {
+      btn.classList.toggle('sb-opt-locked', locked && opt === 'Draco');
+    });
+    if (locked) {
+      _compressionBtns.forEach(({ btn, opt }) => btn.classList.toggle('active', opt === 'None'));
+    }
+  }
+
+  const _initFormat = defaults.format ?? 'gITF';
+  if (_initFormat === 'OBJ') applyObjConstraint(true);
+  applyCompressionConstraint(_initFormat);
 
   // Fabric swatch picker
   const fabricRow = document.createElement('div');
