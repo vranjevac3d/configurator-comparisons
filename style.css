@@ -38,6 +38,35 @@ body {
   overflow: hidden;
   flex-shrink: 0;
   user-select: none;
+  position: relative;
+}
+
+#sidebar-resize {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 20;
+}
+
+#sidebar-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 120ms;
+}
+
+#sidebar-resize:hover::after,
+#sidebar-resize.dragging::after {
+  background: var(--c-accent);
+  opacity: 0.4;
 }
 
 

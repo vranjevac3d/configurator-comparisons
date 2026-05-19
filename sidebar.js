@@ -69,6 +69,48 @@ const LEATHERS = [
 export function initSidebar(onChange, defaults = {}) {
   const sidebar = document.getElementById('sidebar');
 
+  // Restore persisted width
+  const _savedW = localStorage.getItem('sidebar-w');
+  if (_savedW) document.documentElement.style.setProperty('--sidebar-w', `${_savedW}px`);
+
+  // Resize handle
+  const resizeHandle = document.createElement('div');
+  resizeHandle.id = 'sidebar-resize';
+  sidebar.appendChild(resizeHandle);
+
+  let _resizing = false;
+  let _resizeX  = 0;
+  let _resizeW  = 0;
+
+  resizeHandle.addEventListener('mousedown', (e) => {
+    _resizing = true;
+    _resizeX  = e.clientX;
+    _resizeW  = sidebar.getBoundingClientRect().width;
+    resizeHandle.classList.add('dragging');
+    document.body.dataset.sidebarResizing = '1';
+    document.body.style.cursor     = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!_resizing) return;
+    const newW = Math.max(160, Math.min(520, _resizeW + (e.clientX - _resizeX)));
+    document.documentElement.style.setProperty('--sidebar-w', `${newW}px`);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!_resizing) return;
+    _resizing = false;
+    resizeHandle.classList.remove('dragging');
+    delete document.body.dataset.sidebarResizing;
+    document.body.style.cursor     = '';
+    document.body.style.userSelect = '';
+    const finalW = Math.round(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')));
+    localStorage.setItem('sidebar-w', finalW);
+    window.dispatchEvent(new CustomEvent('sidebar-resize-end'));
+  });
+
   // Header
   const header = document.createElement('div');
   header.className = 'sb-header';

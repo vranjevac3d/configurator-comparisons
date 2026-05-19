@@ -1025,6 +1025,7 @@ await loadAndSetupModel(
 // --- Resize ---
 
 function onResize() {
+  if (document.body.dataset.sidebarResizing) return;
   const w = viewport.clientWidth;
   const h = viewport.clientHeight;
   camera.aspect = w / h;
@@ -1035,6 +1036,7 @@ function onResize() {
 }
 
 new ResizeObserver(onResize).observe(viewport);
+window.addEventListener('sidebar-resize-end', onResize);
 onResize();
 
 // --- Animate ---
