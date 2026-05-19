@@ -873,6 +873,30 @@ function convertObjMaterials(obj) {
   });
 }
 
+function showErrorModal(message) {
+  const existing = document.getElementById('error-modal');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'error-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:200;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:6px;padding:24px 28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.18);font-family:system-ui,sans-serif;';
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:13px;font-weight:700;color:#18181f;margin-bottom:8px;';
+  title.textContent = 'File Not Found';
+  const msg = document.createElement('div');
+  msg.style.cssText = 'font-size:11px;color:#9090a8;word-break:break-all;line-height:1.6;margin-bottom:16px;';
+  msg.textContent = message;
+  const btn = document.createElement('button');
+  btn.style.cssText = 'background:#f4f4f8;border:1px solid #dcdce8;border-radius:4px;padding:5px 14px;font-size:11px;cursor:pointer;font-family:inherit;';
+  btn.textContent = 'Dismiss';
+  btn.onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  box.append(title, msg, btn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
 async function loadAndSetupModel(path) {
   loadingEl.classList.remove('hidden');
   metrics.reset();
@@ -896,22 +920,28 @@ async function loadAndSetupModel(path) {
   }
 
   if (!modelCache[path]) {
-    modelCache[path] = await new Promise((resolve, reject) => {
-      if (path.endsWith('.fbx')) {
-        fbxLoader.load(path, (fbx) => resolve({ scene: fbx }), undefined, reject);
-      } else if (path.endsWith('.obj')) {
-        const mtlPath = path.replace(/\.obj$/, '.mtl');
-        mtlLoader.load(mtlPath, (materials) => {
-          materials.preload();
-          objLoader.setMaterials(materials);
-          objLoader.load(path, (obj) => { convertObjMaterials(obj); resolve({ scene: obj }); }, undefined, reject);
-        }, undefined, () => {
-          objLoader.load(path, (obj) => { convertObjMaterials(obj); resolve({ scene: obj }); }, undefined, reject);
-        });
-      } else {
-        gltfLoader.load(path, resolve, undefined, reject);
-      }
-    });
+    try {
+      modelCache[path] = await new Promise((resolve, reject) => {
+        if (path.endsWith('.fbx')) {
+          fbxLoader.load(path, (fbx) => resolve({ scene: fbx }), undefined, reject);
+        } else if (path.endsWith('.obj')) {
+          const mtlPath = path.replace(/\.obj$/, '.mtl');
+          mtlLoader.load(mtlPath, (materials) => {
+            materials.preload();
+            objLoader.setMaterials(materials);
+            objLoader.load(path, (obj) => { convertObjMaterials(obj); resolve({ scene: obj }); }, undefined, reject);
+          }, undefined, () => {
+            objLoader.load(path, (obj) => { convertObjMaterials(obj); resolve({ scene: obj }); }, undefined, reject);
+          });
+        } else {
+          gltfLoader.load(path, resolve, undefined, reject);
+        }
+      });
+    } catch (err) {
+      delete modelCache[path];
+      loadingEl.classList.add('hidden');
+      throw err;
+    }
   }
 
   metrics.markLoadEnd();
@@ -1027,11 +1057,15 @@ const _modelBase  = _complexity === "High poly" ? `${SKU}-HP` : SKU;
 const _meshMerged = getParam("meshStructure", "Separate") === "Merged";
 const _meshBase   = _meshMerged ? `${_modelBase}-merged` : _modelBase;
 
-await loadAndSetupModel(
-  (_fmt === "fbx" || _fmt === "obj")
-    ? `/${SKU}/${_meshBase}.${_fmt}`
-    : `/${SKU}/${_modelBase}${_noComp ? '-no-compression' : ''}${_meshMerged ? '-merged' : ''}.${_fmt}`
-);
+const _modelPath = (_fmt === "fbx" || _fmt === "obj")
+  ? `/${SKU}/${_meshBase}.${_fmt}`
+  : `/${SKU}/${_modelBase}${_noComp ? '-no-compression' : ''}${_meshMerged ? '-merged' : ''}.${_fmt}`;
+
+try {
+  await loadAndSetupModel(_modelPath);
+} catch (err) {
+  showErrorModal(_modelPath);
+}
 
 // --- Resize ---
 
