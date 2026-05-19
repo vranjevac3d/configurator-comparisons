@@ -338,7 +338,7 @@ export function initSidebar(onChange, defaults = {}) {
     return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms} ms`;
   }
 
-  const groupOpen = { models: true, images: true };
+  const groupOpen = { models: true, images: true, icons: false };
 
   resTable.addEventListener('click', (e) => {
     const link = e.target.closest('.res-link');
@@ -407,11 +407,8 @@ export function initSidebar(onChange, defaults = {}) {
     e.preventDefault();
   });
 
-  function renderGroup(id, label, items) {
-    if (!items.length) return '';
-    const totalKB = items.reduce((sum, r) => sum + r.kb, 0);
-    const open = groupOpen[id];
-    const itemsHTML = items.map(r => {
+  function renderItemRows(items) {
+    return items.map(r => {
       const nameEl = r.isModel
         ? `<span class="res-name" title="${r.name}">${r.name}</span>`
         : `<a class="res-name res-link" data-url="${r.url}" title="${r.name}">${r.name}</a>`;
@@ -422,15 +419,36 @@ export function initSidebar(onChange, defaults = {}) {
         <span class="res-time">${fmtMs(r.ms)}</span>
       </div>`;
     }).join('');
+  }
+
+  function renderSubGroup(id, label, items) {
+    if (!items.length) return '';
+    const totalKB = items.reduce((sum, r) => sum + r.kb, 0);
+    const open = groupOpen[id];
     return `
-      <div class="res-group-hd" data-group="${id}">
+      <div class="res-group-hd res-subgroup-hd" data-group="${id}">
         <span class="res-arrow">${open ? '▾' : '▸'}</span>
-        <span class="res-group-label">${label}</span>
-        <span class="res-group-count">${items.length}</span>
+        <span class="res-group-label">${label} <span class="res-group-count">(${items.length})</span></span>
         <span class="res-group-size">${fmtKB(totalKB)}</span>
       </div>
       <div class="res-group-body" data-body="${id}"${open ? '' : ' style="display:none"'}>
-        ${itemsHTML}
+        ${renderItemRows(items)}
+      </div>`;
+  }
+
+  function renderGroup(id, label, items, subContent = '') {
+    if (!items.length && !subContent) return '';
+    const totalKB = items.reduce((sum, r) => sum + r.kb, 0);
+    const open = groupOpen[id];
+    return `
+      <div class="res-group-hd" data-group="${id}">
+        <span class="res-arrow">${open ? '▾' : '▸'}</span>
+        <span class="res-group-label">${label} <span class="res-group-count">(${items.length})</span></span>
+        <span class="res-group-size">${fmtKB(totalKB)}</span>
+      </div>
+      <div class="res-group-body" data-body="${id}"${open ? '' : ' style="display:none"'}>
+        ${renderItemRows(items)}
+        ${subContent}
       </div>`;
   }
 
@@ -467,7 +485,8 @@ export function initSidebar(onChange, defaults = {}) {
         row('Geometries', s.geometries);
 
       const models = s.resources.filter(r => r.isModel);
-      const images = s.resources.filter(r => !r.isModel);
+      const images = s.resources.filter(r => !r.isModel && !r.isIcon);
+      const icons  = s.resources.filter(r => r.isIcon);
       const totalKB = s.resources.reduce((sum, r) => sum + r.kb, 0);
       const totalMs = s.resources.reduce((sum, r) => sum + r.ms, 0);
 
@@ -478,7 +497,7 @@ export function initSidebar(onChange, defaults = {}) {
           <span class="res-summary-time">${fmtMs(totalMs)}</span>
         </div>
         ${renderGroup('models', 'Models', models)}
-        ${renderGroup('images', 'Images', images)}`;
+        ${renderGroup('images', 'Images', images, renderSubGroup('icons', 'Icons', icons))}`;
     },
   };
 }

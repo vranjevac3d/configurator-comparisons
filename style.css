@@ -255,8 +255,6 @@ body {
 }
 
 .sb-resources {
-  max-height: 200px;
-  overflow-y: auto;
   overflow-x: hidden;
   padding: 0 14px 4px;
 }
@@ -289,7 +287,7 @@ body {
 
 .res-group-hd {
   display: grid;
-  grid-template-columns: 12px 1fr auto auto;
+  grid-template-columns: 12px 1fr auto;
   gap: 4px;
   align-items: baseline;
   padding: 3px 0;
@@ -311,7 +309,7 @@ body {
 }
 
 .res-group-count {
-  font-family: var(--mono);
+  font-family: inherit;
   font-size: 11px;
   color: var(--c-muted);
 }
@@ -325,6 +323,12 @@ body {
 
 .res-group-body {
   padding-left: 12px;
+}
+
+.res-subgroup-hd {
+  border-top: none;
+  margin-top: 4px;
+  opacity: 0.8;
 }
 
 .res-row {

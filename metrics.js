@@ -15,6 +15,17 @@ export class MetricsTracker {
   markLoadEnd()   { this._loadEnd   = performance.now(); }
 
   reset() {
+    this._savedIcons = performance.getEntriesByType('resource')
+      .filter(e => e.name.includes('_icon'))
+      .map(e => ({
+        name:    decodeURIComponent(e.name.split('/').pop().split('?')[0]),
+        url:     e.name,
+        kb:      (e.transferSize || e.encodedBodySize) / 1024,
+        ms:      Math.round(e.duration),
+        cached:  e.transferSize === 0 && e.encodedBodySize > 0,
+        isModel: false,
+        isIcon:  true,
+      }));
     performance.clearResourceTimings?.();
     this._samples         = [];
     this._loadStart       = null;
@@ -87,17 +98,20 @@ export class MetricsTracker {
   get textures()   { return this.renderer.info.memory.textures; }
 
   get resources() {
-    return performance.getEntriesByType('resource')
+    const dynamic = performance.getEntriesByType('resource')
       .filter(e => /\.(gltf|glb|bin|jpg|jpeg|webp|ktx2|avif|png)(\?|$)/i.test(e.name))
       .sort((a, b) => b.duration - a.duration)
       .map(e => ({
-        name:    e.name.split('/').pop().split('?')[0],
+        name:    decodeURIComponent(e.name.split('/').pop().split('?')[0]),
         url:     e.name,
         kb:      (e.transferSize || e.encodedBodySize) / 1024,
         ms:      Math.round(e.duration),
         cached:  e.transferSize === 0 && e.encodedBodySize > 0,
         isModel: /\.(gltf|glb|bin)/i.test(e.name),
+        isIcon:  e.name.includes('_icon'),
       }));
+    const saved = (this._savedIcons || []).filter(icon => !dynamic.some(d => d.name === icon.name));
+    return [...dynamic, ...saved];
   }
 
   snapshot() {
