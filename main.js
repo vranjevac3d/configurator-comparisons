@@ -190,6 +190,7 @@ if (getParam("envLight", "HDR map") !== "Flat ambient") {
 // --- Material name helpers (ported from hookerfurniture-pwa core.js) ---
 
 function materialWithBake(name) {
+  if (!name) return false;
   const primary = [
     "arm", "back_inside_cushion", "back", "front", "wing", "seat",
     "throw_pillow", "ottoman", "headrest", "console", "main",
@@ -431,8 +432,8 @@ function setFabricMode(mode) {
     if (!mat) return;
 
     const isBake = materialWithBake(mat.name);
-    const isWelt = !isBake && mat.name.includes('welt');
-    const isWood = mat.name.includes('wood');
+    const isWelt = !isBake && mat.name?.includes('welt');
+    const isWood = mat.name?.includes('wood');
     if (!isBake && !isWelt && !isWood) return;
 
     const prevNormal    = mat.normalMap;
@@ -655,7 +656,7 @@ async function applyLeather(sku) {
     if (!mat) return;
 
     const isBake = materialWithBake(mat.name);
-    const isWelt = !isBake && mat.name.includes('welt');
+    const isWelt = !isBake && mat.name?.includes('welt');
     if (!isBake && !isWelt) return;
 
     mat.map          = tex.map;
@@ -724,7 +725,7 @@ async function applyFabricCover(sku) {
     if (!mat) return;
 
     const isBake = materialWithBake(mat.name);
-    const isWelt = !isBake && mat.name.includes('welt');
+    const isWelt = !isBake && mat.name?.includes('welt');
     if (!isBake && !isWelt) return;
 
     mat.map          = tex.map;
@@ -784,7 +785,7 @@ async function applyWood(name) {
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
     const mat = node.material;
-    if (!mat || !mat.name.includes("wood")) return;
+    if (!mat || !mat.name?.includes("wood")) return;
     mat.map                           = tex.map;
     mat.normalMap                     = tex.normalMap;
     mat.roughnessMap                  = tex.roughnessMap;
