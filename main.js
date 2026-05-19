@@ -283,9 +283,9 @@ function loadTextureOptional(path) {
 
 const SKU = "478-75";
 
-const _isHighPoly       = getParam("complexity", "Low poly + Normal + AO") === "High poly";
-const _needsNormal      = !_isHighPoly;
-const _needsAO          = !_isHighPoly;
+const _complexity  = getParam("complexity", "Low poly + Normal + AO");
+const _needsNormal = _complexity === "Low poly + Normal" || _complexity === "Low poly + Normal + AO";
+const _needsAO     = _complexity === "Low poly + AO"     || _complexity === "Low poly + Normal + AO";
 const _needsBakedShadow = getParam("floorShadow", "Contact") === 'Baked';
 
 const _bakeMode = getParam("fabricCover", null) ? 'fabric' : 'leather';
@@ -970,7 +970,7 @@ async function loadAndSetupModel(path) {
 
 const _fmt        = getParam("format", "gltf");
 const _noComp     = getParam("compression", "draco") === "none";
-const _modelBase  = getParam("complexity", "Low poly + Normal + AO") === "High poly" ? `${SKU}-HP` : SKU;
+const _modelBase  = _complexity === "High poly" ? `${SKU}-HP` : SKU;
 
 await loadAndSetupModel(
   (_fmt === "fbx" || _fmt === "obj")
