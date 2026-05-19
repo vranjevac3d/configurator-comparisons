@@ -1030,9 +1030,7 @@ const _meshBase   = _meshMerged ? `${_modelBase}-merged` : _modelBase;
 await loadAndSetupModel(
   (_fmt === "fbx" || _fmt === "obj")
     ? `/${SKU}/${_meshBase}.${_fmt}`
-    : _noComp
-      ? `/${SKU}/${_meshBase}-no-compression.${_fmt}`
-      : `/${SKU}/${_meshBase}.${_fmt}`
+    : `/${SKU}/${_modelBase}${_noComp ? '-no-compression' : ''}${_meshMerged ? '-merged' : ''}.${_fmt}`
 );
 
 // --- Resize ---
