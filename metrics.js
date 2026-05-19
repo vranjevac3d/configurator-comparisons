@@ -99,7 +99,7 @@ export class MetricsTracker {
 
   get resources() {
     const dynamic = performance.getEntriesByType('resource')
-      .filter(e => /\.(gltf|glb|bin|jpg|jpeg|webp|ktx2|avif|png)(\?|$)/i.test(e.name))
+      .filter(e => /\.(gltf|glb|bin|fbx|obj|mtl|jpg|jpeg|webp|ktx2|avif|png)(\?|$)/i.test(e.name))
       .sort((a, b) => b.duration - a.duration)
       .map(e => ({
         name:    decodeURIComponent(e.name.split('/').pop().split('?')[0]),
@@ -107,7 +107,7 @@ export class MetricsTracker {
         kb:      (e.transferSize || e.encodedBodySize) / 1024,
         ms:      Math.round(e.duration),
         cached:  e.transferSize === 0 && e.encodedBodySize > 0,
-        isModel: /\.(gltf|glb|bin)/i.test(e.name),
+        isModel: /\.(gltf|glb|bin|fbx|obj|mtl)/i.test(e.name),
         isIcon:  e.name.includes('_icon'),
       }));
     const saved = (this._savedIcons || []).filter(icon => !dynamic.some(d => d.name === icon.name));
