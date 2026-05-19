@@ -298,17 +298,19 @@ const _needsAO     = _complexity === "Low poly + AO"     || _complexity === "Low
 const _needsBakedShadow = getParam("floorShadow", "Contact") === 'Baked';
 
 const _bakeMode = getParam("fabricCover", null) ? 'fabric' : 'leather';
+const _texExt   = getParam("texture", "jpg");
+const _resDir   = getParam("res", "2k");
 
 const leatherBake = {
-  normalMap: (_needsNormal      && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_LEATHER_Normal.jpg`) : null,
-  aoMap:     (_needsBakedShadow && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_LEATHER_AO.jpg`)      : null,
-  leatherAO: (_needsAO          && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_LEATHER_AO.jpg`)     : null,
+  normalMap: (_needsNormal      && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${_resDir}/${SKU}_LEATHER_Normal.${_texExt}`) : null,
+  aoMap:     (_needsBakedShadow && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${_resDir}/${SKU}_LEATHER_AO.${_texExt}`)      : null,
+  leatherAO: (_needsAO          && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${_resDir}/${SKU}_LEATHER_AO.${_texExt}`)     : null,
 };
 
 const fabricBake = {
-  normalMap: (_needsNormal      && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_FABRIC_Normal.jpg`) : null,
-  aoMap:     (_needsBakedShadow && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_FABRIC_AO.jpg`)      : null,
-  leatherAO: (_needsAO          && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_FABRIC_AO.jpg`)     : null,
+  normalMap: (_needsNormal      && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${_resDir}/${SKU}_FABRIC_Normal.${_texExt}`) : null,
+  aoMap:     (_needsBakedShadow && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${_resDir}/${SKU}_FABRIC_AO.${_texExt}`)      : null,
+  leatherAO: (_needsAO          && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${_resDir}/${SKU}_FABRIC_AO.${_texExt}`)     : null,
 };
 
 
