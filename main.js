@@ -42,7 +42,10 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "resolution") {
     navigateWithParam("res", { "2K": "2k", "1K": "1k", "512px": "512" }[option]);
   } else if (categoryId === "format") {
-    navigateWithParam("format", { GLB: "glb", gITF: "gltf", FBX: "fbx", OBJ: "obj" }[option]);
+    const p = new URLSearchParams(location.search);
+    p.set("format", { GLB: "glb", gITF: "gltf", FBX: "fbx", OBJ: "obj" }[option]);
+    if (option === "OBJ") p.delete("meshStructure");
+    location.href = `?${p}`;
   } else if (categoryId === "compression") {
     navigateWithParam("compression", { Draco: "draco", None: "none" }[option]);
   } else if (categoryId === "fabricCover") {
@@ -71,6 +74,8 @@ const sidebar = initSidebar((categoryId, option) => {
     navigateWithParam("pixelRatio", option === "1x" ? "1" : "2");
   } else if (categoryId === "modelComplexity") {
     navigateWithParam("complexity", option);
+  } else if (categoryId === "meshStructure") {
+    navigateWithParam("meshStructure", option);
   }
 }, {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
@@ -87,11 +92,14 @@ const sidebar = initSidebar((categoryId, option) => {
   anisotropy:       getParam("anisotropy", "4x"),
   pixelRatio:       getParam("pixelRatio", "2") === "1" ? "1x" : "2x",
   modelComplexity:  getParam("complexity", "Low poly + Normal + AO"),
+  meshStructure:    getParam("meshStructure", "Separate"),
 });
 
 if (getParam("complexity", "Low poly + Normal + AO") !== "Low poly + Normal + AO") {
   sidebar.setMaterialTabEnabled(false);
 }
+
+sidebar.setMeshStructureEnabled(getParam("format", "gltf") !== "obj");
 
 // --- Renderer ---
 
@@ -428,33 +436,34 @@ function setFabricMode(mode) {
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
-    const mat = node.material;
-    if (!mat) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    for (const mat of mats) {
+      if (!mat) continue;
 
-    const isBake = materialWithBake(mat.name);
-    const isWelt = !isBake && mat.name?.includes('welt');
-    const isWood = mat.name?.includes('wood');
-    if (!isBake && !isWelt && !isWood) return;
+      const isBake = materialWithBake(mat.name) || !!mat.userData.isObjMaterial;
+      const isWelt = !isBake && mat.name?.includes('welt');
+      const isWood = mat.name?.includes('wood');
+      if (!isBake && !isWelt && !isWood) continue;
 
-    const prevNormal    = mat.normalMap;
-    const prevRoughness = mat.roughnessMap;
-    const prevAoMap     = mat.aoMap;
+      const prevNormal    = mat.normalMap;
+      const prevRoughness = mat.roughnessMap;
+      const prevAoMap     = mat.aoMap;
 
-    mat.normalMap    = showNormal    ? mat.userData.fullPBR_normalMap    ?? mat.normalMap    : null;
-    mat.roughnessMap = showRoughness ? mat.userData.fullPBR_roughnessMap ?? mat.roughnessMap : null;
-    if (isBake) {
-      mat.aoMap = showAO ? (mat.userData.fullPBR_aoMap ?? mat.aoMap) : null;
-      mat.aoMapIntensity = aoIntensity;
-      const ao2 = showAO && bakedShadow && mat.userData.bakedShadowsAO
-        ? mat.userData.bakedShadowsAO
-        : neutralAO;
-      mat.userData.pendingAoMap2 = ao2;
-      if (mat.userData.shader) mat.userData.shader.uniforms.aoMap2.value = ao2;
-    }
+      mat.normalMap    = showNormal    ? mat.userData.fullPBR_normalMap    ?? mat.normalMap    : null;
+      mat.roughnessMap = showRoughness ? mat.userData.fullPBR_roughnessMap ?? mat.roughnessMap : null;
+      if (isBake) {
+        mat.aoMap = showAO ? (mat.userData.fullPBR_aoMap ?? mat.aoMap) : null;
+        mat.aoMapIntensity = aoIntensity;
+        const ao2 = showAO && bakedShadow && mat.userData.bakedShadowsAO
+          ? mat.userData.bakedShadowsAO
+          : neutralAO;
+        mat.userData.pendingAoMap2 = ao2;
+        if (mat.userData.shader) mat.userData.shader.uniforms.aoMap2.value = ao2;
+      }
 
-    // Only recompile when defines change (texture null↔set transitions)
-    if (mat.normalMap !== prevNormal || mat.roughnessMap !== prevRoughness || mat.aoMap !== prevAoMap) {
-      mat.needsUpdate = true;
+      if (mat.normalMap !== prevNormal || mat.roughnessMap !== prevRoughness || mat.aoMap !== prevAoMap) {
+        mat.needsUpdate = true;
+      }
     }
   });
 }
@@ -652,31 +661,32 @@ async function applyLeather(sku) {
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
-    const mat = node.material;
-    if (!mat) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    for (const mat of mats) {
+      if (!mat) continue;
 
-    const isBake = materialWithBake(mat.name);
-    const isWelt = !isBake && mat.name?.includes('welt');
-    if (!isBake && !isWelt) return;
+      const isBake = materialWithBake(mat.name) || !!mat.userData.isObjMaterial;
+      const isWelt = !isBake && mat.name?.includes('welt');
+      if (!isBake && !isWelt) continue;
 
-    mat.map          = tex.map;
-    mat.roughnessMap = tex.roughnessMap;
-    mat.needsUpdate  = true;
+      mat.map          = tex.map;
+      mat.roughnessMap = tex.roughnessMap;
+      mat.needsUpdate  = true;
 
-    if (isBake) {
-      swapBake(mat, leatherBake);
-      mat.userData.detailNormal         = tex.normalMap;
-      mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
-      if (mat.userData.shader) {
-        mat.userData.shader.uniforms.normalMap2.value = tex.normalMap || neutralAO;
+      if (isBake) {
+        swapBake(mat, leatherBake);
+        mat.userData.detailNormal         = tex.normalMap;
+        mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
+        if (mat.userData.shader) {
+          mat.userData.shader.uniforms.normalMap2.value = tex.normalMap || neutralAO;
+        }
+      } else {
+        mat.normalMap = tex.normalMap ?? null;
+        if (tex.normalMap) tex.normalMap.channel = 0;
+        mat.userData.fullPBR_normalMap    = tex.normalMap;
+        mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
+        mat.needsUpdate                   = true;
       }
-    } else {
-      // Welt: no bake setup, just assign the tiling normal directly
-      mat.normalMap = tex.normalMap ?? null;
-      if (tex.normalMap) tex.normalMap.channel = 0;
-      mat.userData.fullPBR_normalMap    = tex.normalMap;
-      mat.userData.fullPBR_roughnessMap = tex.roughnessMap;
-      mat.needsUpdate                   = true;
     }
   });
 
@@ -721,28 +731,30 @@ async function applyFabricCover(sku) {
 
   loadedModel.traverse((node) => {
     if (!node.isMesh) return;
-    const mat = node.material;
-    if (!mat) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    for (const mat of mats) {
+      if (!mat) continue;
 
-    const isBake = materialWithBake(mat.name);
-    const isWelt = !isBake && mat.name?.includes('welt');
-    if (!isBake && !isWelt) return;
+      const isBake = materialWithBake(mat.name) || !!mat.userData.isObjMaterial;
+      const isWelt = !isBake && mat.name?.includes('welt');
+      if (!isBake && !isWelt) continue;
 
-    mat.map          = tex.map;
-    mat.roughnessMap = null;
-    mat.needsUpdate  = true;
+      mat.map          = tex.map;
+      mat.roughnessMap = null;
+      mat.needsUpdate  = true;
 
-    if (isBake) {
-      swapBake(mat, fabricBake);
-      mat.userData.detailNormal         = tex.normalMap;
-      mat.userData.fullPBR_roughnessMap = null;
-      if (mat.userData.shader) {
-        mat.userData.shader.uniforms.normalMap2.value = tex.normalMap || fabricBake.normalMap || neutralAO;
+      if (isBake) {
+        swapBake(mat, fabricBake);
+        mat.userData.detailNormal         = tex.normalMap;
+        mat.userData.fullPBR_roughnessMap = null;
+        if (mat.userData.shader) {
+          mat.userData.shader.uniforms.normalMap2.value = tex.normalMap || fabricBake.normalMap || neutralAO;
+        }
+      } else {
+        mat.normalMap                     = tex.normalMap ?? null;
+        mat.userData.fullPBR_normalMap    = tex.normalMap;
+        mat.userData.fullPBR_roughnessMap = null;
       }
-    } else {
-      mat.normalMap                     = tex.normalMap ?? null;
-      mat.userData.fullPBR_normalMap    = tex.normalMap;
-      mat.userData.fullPBR_roughnessMap = null;
     }
   });
 
@@ -821,6 +833,33 @@ function cloneScene(source) {
   return clone;
 }
 
+function convertObjMaterials(obj) {
+  const convert = (old) => {
+    if (!old?.isMeshPhongMaterial) return old;
+    const mat = new THREE.MeshStandardMaterial({
+      name:        old.name,
+      map:         old.map      ?? null,
+      color:       old.color.clone(),
+      side:        old.side,
+      transparent: old.transparent,
+      opacity:     old.opacity,
+      alphaMap:    old.alphaMap ?? null,
+    });
+    mat.userData.isObjMaterial = true;
+    old.dispose();
+    return mat;
+  };
+
+  obj.traverse((node) => {
+    if (!node.isMesh) return;
+    if (Array.isArray(node.material)) {
+      node.material = node.material.map(convert);
+    } else {
+      node.material = convert(node.material);
+    }
+  });
+}
+
 async function loadAndSetupModel(path) {
   loadingEl.classList.remove('hidden');
   metrics.reset();
@@ -852,9 +891,9 @@ async function loadAndSetupModel(path) {
         mtlLoader.load(mtlPath, (materials) => {
           materials.preload();
           objLoader.setMaterials(materials);
-          objLoader.load(path, (obj) => resolve({ scene: obj }), undefined, reject);
+          objLoader.load(path, (obj) => { convertObjMaterials(obj); resolve({ scene: obj }); }, undefined, reject);
         }, undefined, () => {
-          objLoader.load(path, (obj) => resolve({ scene: obj }), undefined, reject);
+          objLoader.load(path, (obj) => { convertObjMaterials(obj); resolve({ scene: obj }); }, undefined, reject);
         });
       } else {
         gltfLoader.load(path, resolve, undefined, reject);
@@ -972,13 +1011,15 @@ async function loadAndSetupModel(path) {
 const _fmt        = getParam("format", "gltf");
 const _noComp     = getParam("compression", "draco") === "none";
 const _modelBase  = _complexity === "High poly" ? `${SKU}-HP` : SKU;
+const _meshMerged = getParam("meshStructure", "Separate") === "Merged";
+const _meshBase   = _meshMerged ? `${_modelBase}-merged` : _modelBase;
 
 await loadAndSetupModel(
   (_fmt === "fbx" || _fmt === "obj")
-    ? `/${SKU}/${_modelBase}.${_fmt}`
+    ? `/${SKU}/${_meshBase}.${_fmt}`
     : _noComp
-      ? `/${SKU}/${_modelBase}-no-compression.${_fmt}`
-      : `/${SKU}/${_modelBase}.${_fmt}`
+      ? `/${SKU}/${_meshBase}-no-compression.${_fmt}`
+      : `/${SKU}/${_meshBase}.${_fmt}`
 );
 
 // --- Resize ---

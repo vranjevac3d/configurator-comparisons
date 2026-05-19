@@ -1,6 +1,18 @@
 const CATEGORIES = [
   {
-    id: 'textures', label: 'Textures',
+    id: 'format', label: '3D Format',
+    options: ['GLB', 'gITF', 'FBX', 'OBJ', 'USDZ'], default: 'gITF',
+  },
+  {
+    id: 'compression', label: 'Compression',
+    options: ['Draco', 'None'], default: 'Draco',
+  },
+  {
+    id: 'meshStructure', label: 'Mesh Structure',
+    options: ['Separate', 'Merged'], default: 'Separate',
+  },
+  {
+    id: 'textures', label: 'Texture Format',
     options: ['JPG', 'WebP', 'KTX2', 'AVIF'], default: 'JPG',
   },
   {
@@ -8,21 +20,17 @@ const CATEGORIES = [
     options: ['2K', '1K', '512px'], default: '2K',
   },
   {
-    id: 'modelComplexity', label: 'Model Complexity',
-    options: ['High poly', 'Low poly + Normal', 'Low poly + AO', 'Low poly + Normal + AO'], default: 'Low poly + Normal + AO',
-  },
-  {
     id: 'fabrics', label: 'Material',
     options: ['Full PBR', 'Diffuse', 'Normal Map', 'Roughness Map', 'AO Map'], default: 'Full PBR',
     multiSelect: true,
   },
   {
-    id: 'format', label: '3D Format',
-    options: ['GLB', 'gITF', 'FBX', 'OBJ', 'USDZ'], default: 'gITF',
+    id: 'anisotropy', label: 'Anisotropy',
+    options: ['1x', '2x', '4x', '8x', 'MAX'], default: '4x',
   },
   {
-    id: 'compression', label: 'Compression',
-    options: ['Draco', 'None'], default: 'Draco',
+    id: 'textureFiles', label: 'Texture Files',
+    options: ['Texture atlas', 'Separate'], default: 'Separate',
   },
   {
     id: 'envLighting', label: 'Env Lighting',
@@ -39,14 +47,6 @@ const CATEGORIES = [
   {
     id: 'pixelRatio', label: 'Pixel Ratio',
     options: ['1x', '2x'], default: '2x',
-  },
-  {
-    id: 'anisotropy', label: 'Anisotropy',
-    options: ['1x', '2x', '4x', '8x', 'MAX'], default: '4x',
-  },
-  {
-    id: 'textureFiles', label: 'Texture Files',
-    options: ['Texture atlas', 'Separate'], default: 'Separate',
   },
 ];
 
@@ -79,6 +79,7 @@ export function initSidebar(onChange, defaults = {}) {
   let _matSet  = null;
   let _matOnChange = null;
   let _fabricsRow = null;
+  let _meshStructureRow = null;
 
   // Config tab header
   const configHeader = document.createElement('div');
@@ -97,6 +98,7 @@ export function initSidebar(onChange, defaults = {}) {
     const row = document.createElement('div');
     const wip = WIP_IDS.has(cat.id);
     row.className = 'sb-row' + (wip ? ' sb-row-wip' : '');
+    if (cat.id === 'meshStructure') _meshStructureRow = row;
 
     const label = document.createElement('div');
     label.className = 'sb-row-label';
@@ -456,6 +458,10 @@ export function initSidebar(onChange, defaults = {}) {
     setMaterialTabEnabled(enabled) {
       if (!_fabricsRow) return;
       _fabricsRow.classList.toggle('sb-row-disabled', !enabled);
+    },
+    setMeshStructureEnabled(enabled) {
+      if (!_meshStructureRow) return;
+      _meshStructureRow.classList.toggle('sb-row-disabled', !enabled);
     },
     setMaterialCapabilities({ normal = true, roughness = true, ao = true }) {
       if (!_matOpts) return;
