@@ -44,7 +44,10 @@ const sidebar = initSidebar((categoryId, option) => {
   } else if (categoryId === "format") {
     const p = new URLSearchParams(location.search);
     p.set("format", { GLB: "glb", gITF: "gltf", FBX: "fbx", OBJ: "obj" }[option]);
-    if (option === "OBJ") p.delete("meshStructure");
+    if (option === "OBJ") {
+      p.delete("meshStructure");
+      p.set("complexity", "High poly");
+    }
     location.href = `?${p}`;
   } else if (categoryId === "compression") {
     navigateWithParam("compression", { Draco: "draco", None: "none" }[option]);
@@ -442,10 +445,11 @@ function setFabricMode(mode) {
     for (const mat of mats) {
       if (!mat) continue;
 
-      const isBake = materialWithBake(mat.name) || !!mat.userData.isObjMaterial;
-      const isWelt = !isBake && mat.name?.includes('welt');
-      const isWood = mat.name?.includes('wood');
-      if (!isBake && !isWelt && !isWood) continue;
+      const isObjMat = !!mat.userData.isObjMaterial;
+      const isBake   = !isObjMat && materialWithBake(mat.name);
+      const isWelt   = !isBake && !isObjMat && mat.name?.includes('welt');
+      const isWood   = mat.name?.includes('wood');
+      if (!isBake && !isWelt && !isWood && !isObjMat) continue;
 
       const prevNormal    = mat.normalMap;
       const prevRoughness = mat.roughnessMap;
@@ -667,9 +671,10 @@ async function applyLeather(sku) {
     for (const mat of mats) {
       if (!mat) continue;
 
-      const isBake = materialWithBake(mat.name) || !!mat.userData.isObjMaterial;
-      const isWelt = !isBake && mat.name?.includes('welt');
-      if (!isBake && !isWelt) continue;
+      const isObjMat = !!mat.userData.isObjMaterial;
+      const isBake   = !isObjMat && materialWithBake(mat.name);
+      const isWelt   = !isBake && !isObjMat && mat.name?.includes('welt');
+      if (!isBake && !isWelt && !isObjMat) continue;
 
       mat.map          = tex.map;
       mat.roughnessMap = tex.roughnessMap;
@@ -737,9 +742,10 @@ async function applyFabricCover(sku) {
     for (const mat of mats) {
       if (!mat) continue;
 
-      const isBake = materialWithBake(mat.name) || !!mat.userData.isObjMaterial;
-      const isWelt = !isBake && mat.name?.includes('welt');
-      if (!isBake && !isWelt) continue;
+      const isObjMat = !!mat.userData.isObjMaterial;
+      const isBake   = !isObjMat && materialWithBake(mat.name);
+      const isWelt   = !isBake && !isObjMat && mat.name?.includes('welt');
+      if (!isBake && !isWelt && !isObjMat) continue;
 
       mat.map          = tex.map;
       mat.roughnessMap = null;
@@ -939,25 +945,6 @@ async function loadAndSetupModel(path) {
       mat.userData.isArm             = isArm;
       mat.userData.fullPBR_normalMap = mat.normalMap;
       mat.userData.fullPBR_aoMap     = mat.aoMap;
-      mat.userData.pendingAoMap2      = neutralAO;
-      mat.userData.pendingModelShadow = neutralAO;
-      setupNormalBlend(mat, hasUV1);
-      mat.needsUpdate = true;
-    } else if (mat.userData?.isObjMaterial) {
-      const hasUV1   = !!node.geometry.attributes.uv1;
-      const initBake = _bakeMode === 'fabric' ? fabricBake : leatherBake;
-      if (hasUV1) {
-        if (initBake.normalMap) { const n = initBake.normalMap.clone(); n.channel = 1; mat.normalMap = n; }
-        if (initBake.leatherAO) { const ao = initBake.leatherAO.clone(); ao.channel = 1; mat.aoMap = ao; }
-      } else {
-        mat.normalMap = initBake.normalMap;
-        mat.aoMap     = initBake.leatherAO;
-      }
-      if (initBake.aoMap) mat.userData.bakedShadowsAO = initBake.aoMap;
-
-      mat.userData.hasUV1             = hasUV1;
-      mat.userData.fullPBR_normalMap  = mat.normalMap;
-      mat.userData.fullPBR_aoMap      = mat.aoMap;
       mat.userData.pendingAoMap2      = neutralAO;
       mat.userData.pendingModelShadow = neutralAO;
       setupNormalBlend(mat, hasUV1);

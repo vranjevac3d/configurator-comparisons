@@ -466,6 +466,33 @@ body {
   color: var(--c-text);
 }
 
+/* ── OBJ-locked complexity buttons ───────────────────── */
+
+.sb-opt-obj-locked {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Cursor-following tooltip ─────────────────────────── */
+
+.sb-cursor-tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--c-text);
+  color: var(--c-surface);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 80ms;
+}
+
+.sb-cursor-tooltip.visible {
+  opacity: 1;
+}
+
 /* ── Viewport ─────────────────────────────────────────── */
 
 #viewport {

@@ -4,6 +4,10 @@ const CATEGORIES = [
     options: ['GLB', 'gITF', 'FBX', 'OBJ', 'USDZ'], default: 'gITF',
   },
   {
+    id: 'modelComplexity', label: 'Model Complexity',
+    options: ['High poly', 'Low poly + Normal + AO', 'Low poly + Normal', 'Low poly + AO', 'Low poly'], default: 'Low poly + Normal + AO',
+  },
+  {
     id: 'compression', label: 'Compression',
     options: ['Draco', 'None'], default: 'Draco',
   },
@@ -122,6 +126,7 @@ export function initSidebar(onChange, defaults = {}) {
   let _matOnChange = null;
   let _fabricsRow = null;
   let _meshStructureRow = null;
+  let _complexityBtns = [];
 
   // Config tab header
   const configHeader = document.createElement('div');
@@ -132,6 +137,16 @@ export function initSidebar(onChange, defaults = {}) {
   // Config scroll area
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
+
+  const _objTooltip = document.createElement('div');
+  _objTooltip.className = 'sb-cursor-tooltip';
+  _objTooltip.textContent = 'OBJ does not support multiple UV sets';
+  document.body.appendChild(_objTooltip);
+
+  document.addEventListener('mousemove', (e) => {
+    _objTooltip.style.left = `${e.clientX + 14}px`;
+    _objTooltip.style.top  = `${e.clientY - 10}px`;
+  });
 
   const WIP_IDS = new Set(['textureFiles']);
   const WIP_OPTS = new Set(['format:USDZ']);
@@ -198,8 +213,16 @@ export function initSidebar(onChange, defaults = {}) {
         const activeOpt = defaults[cat.id] ?? cat.default;
         btn.className = 'sb-opt' + (opt === activeOpt ? ' active' : '') + (wipOpt ? ' sb-opt-wip' : '');
         btn.textContent = opt;
+        if (cat.id === 'modelComplexity') {
+          _complexityBtns.push({ btn, opt });
+          btn.addEventListener('mouseenter', () => {
+            if (btn.classList.contains('sb-opt-obj-locked')) _objTooltip.classList.add('visible');
+          });
+          btn.addEventListener('mouseleave', () => _objTooltip.classList.remove('visible'));
+        }
         if (!wip && !wipOpt) {
           btn.addEventListener('click', () => {
+            if (btn.classList.contains('sb-opt-obj-locked')) return;
             opts.querySelectorAll('.sb-opt').forEach((b) => b.classList.remove('active'));
             btn.classList.add('active');
             onChange?.(cat.id, opt);
@@ -212,6 +235,17 @@ export function initSidebar(onChange, defaults = {}) {
     row.appendChild(opts);
     configEl.appendChild(row);
   });
+
+  function applyObjConstraint(isObj) {
+    _complexityBtns.forEach(({ btn, opt }) => {
+      btn.classList.toggle('sb-opt-obj-locked', isObj && opt !== 'High poly');
+    });
+    if (isObj) {
+      _complexityBtns.forEach(({ btn, opt }) => btn.classList.toggle('active', opt === 'High poly'));
+    }
+  }
+
+  if ((defaults.format ?? 'gITF') === 'OBJ') applyObjConstraint(true);
 
   // Fabric swatch picker
   const fabricRow = document.createElement('div');
