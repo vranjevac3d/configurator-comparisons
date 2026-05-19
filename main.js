@@ -300,15 +300,15 @@ const _needsBakedShadow = getParam("floorShadow", "Contact") === 'Baked';
 const _bakeMode = getParam("fabricCover", null) ? 'fabric' : 'leather';
 
 const leatherBake = {
-  normalMap: (_needsNormal      && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/${SKU}_LEATHER_Normal.jpg`) : null,
-  aoMap:     (_needsBakedShadow && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)      : null,
-  leatherAO: (_needsAO          && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/${SKU}_LEATHER_AO.jpg`)     : null,
+  normalMap: (_needsNormal      && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_LEATHER_Normal.jpg`) : null,
+  aoMap:     (_needsBakedShadow && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_LEATHER_AO.jpg`)      : null,
+  leatherAO: (_needsAO          && _bakeMode === 'leather') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_LEATHER_AO.jpg`)     : null,
 };
 
 const fabricBake = {
-  normalMap: (_needsNormal      && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/${SKU}_FABRIC_Normal.jpg`) : null,
-  aoMap:     (_needsBakedShadow && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/${SKU}_FABRIC_AO.jpg`)      : null,
-  leatherAO: (_needsAO          && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/${SKU}_FABRIC_AO.jpg`)     : null,
+  normalMap: (_needsNormal      && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_FABRIC_Normal.jpg`) : null,
+  aoMap:     (_needsBakedShadow && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_FABRIC_AO.jpg`)      : null,
+  leatherAO: (_needsAO          && _bakeMode === 'fabric') ? await loadTexture(`/${SKU}/custom_maps/${SKU}_FABRIC_AO.jpg`)     : null,
 };
 
 
