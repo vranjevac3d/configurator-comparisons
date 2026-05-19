@@ -48,7 +48,9 @@ const sidebar = initSidebar((categoryId, option) => {
       p.delete("meshStructure");
       p.set("complexity", "High poly");
     }
-    if (option !== "GLB" && option !== "gITF") {
+    if (option === "GLB" || option === "gITF") {
+      p.set("compression", "draco");
+    } else {
       p.set("compression", "none");
     }
     location.href = `?${p}`;
