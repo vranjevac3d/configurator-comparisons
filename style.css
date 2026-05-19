@@ -134,6 +134,15 @@ body {
   color: var(--c-tag-active-text);
 }
 
+/* ── Disabled rows ───────────────────────────────────── */
+
+.sb-row-disabled .sb-row-label { opacity: 0.4; }
+.sb-row-disabled .sb-opt {
+  opacity: 0.3;
+  pointer-events: none;
+  cursor: default;
+}
+
 /* ── WIP rows ────────────────────────────────────────── */
 
 .sb-row-wip { position: relative; }

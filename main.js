@@ -69,6 +69,8 @@ const sidebar = initSidebar((categoryId, option) => {
     navigateWithParam("anisotropy", option);
   } else if (categoryId === "pixelRatio") {
     navigateWithParam("pixelRatio", option === "1x" ? "1" : "2");
+  } else if (categoryId === "modelComplexity") {
+    navigateWithParam("complexity", option);
   }
 }, {
   textures:    { jpg: "JPG", webp: "WebP", ktx2: "KTX2", avif: "AVIF" }[getParam("texture", "jpg")] ?? "JPG",
@@ -82,9 +84,14 @@ const sidebar = initSidebar((categoryId, option) => {
   modelShadows: getParam("modelShadow", "Real-time"),
   floorShadows: getParam("floorShadow", "Contact"),
   envLighting:  getParam("envLight", "HDR map"),
-  anisotropy:   getParam("anisotropy", "4x"),
-  pixelRatio:   getParam("pixelRatio", "2") === "1" ? "1x" : "2x",
+  anisotropy:       getParam("anisotropy", "4x"),
+  pixelRatio:       getParam("pixelRatio", "2") === "1" ? "1x" : "2x",
+  modelComplexity:  getParam("complexity", "Low poly + Normal + AO"),
 });
+
+if (getParam("complexity", "Low poly + Normal + AO") !== "Low poly + Normal + AO") {
+  sidebar.setMaterialTabEnabled(false);
+}
 
 // --- Renderer ---
 
@@ -276,8 +283,9 @@ function loadTextureOptional(path) {
 
 const SKU = "478-75";
 
-const _needsNormal      = true;
-const _needsAO          = true;
+const _isHighPoly       = getParam("complexity", "Low poly + Normal + AO") === "High poly";
+const _needsNormal      = !_isHighPoly;
+const _needsAO          = !_isHighPoly;
 const _needsBakedShadow = getParam("floorShadow", "Contact") === 'Baked';
 
 const _bakeMode = getParam("fabricCover", null) ? 'fabric' : 'leather';
@@ -960,14 +968,16 @@ async function loadAndSetupModel(path) {
   metrics.markModelLoaded();
 }
 
-const _fmt     = getParam("format", "gltf");
-const _noComp  = getParam("compression", "draco") === "none";
+const _fmt        = getParam("format", "gltf");
+const _noComp     = getParam("compression", "draco") === "none";
+const _modelBase  = getParam("complexity", "Low poly + Normal + AO") === "High poly" ? `${SKU}-HP` : SKU;
+
 await loadAndSetupModel(
   (_fmt === "fbx" || _fmt === "obj")
-    ? `/${SKU}/${SKU}.${_fmt}`
+    ? `/${SKU}/${_modelBase}.${_fmt}`
     : _noComp
-      ? `/${SKU}/${SKU}-no-compression.${_fmt}`
-      : `/${SKU}/${SKU}.${_fmt}`
+      ? `/${SKU}/${_modelBase}-no-compression.${_fmt}`
+      : `/${SKU}/${_modelBase}.${_fmt}`
 );
 
 // --- Resize ---

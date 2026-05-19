@@ -9,7 +9,7 @@ const CATEGORIES = [
   },
   {
     id: 'modelComplexity', label: 'Model Complexity',
-    options: ['High poly', 'Low poly + Normal', 'Low poly + AO'], default: 'High poly',
+    options: ['High poly', 'Low poly + Normal', 'Low poly + AO', 'Low poly + Normal + AO'], default: 'Low poly + Normal + AO',
   },
   {
     id: 'fabrics', label: 'Material',
@@ -45,10 +45,6 @@ const CATEGORIES = [
     options: ['1x', '2x', '4x', '8x', 'MAX'], default: '4x',
   },
   {
-    id: 'drawCallBatching', label: 'Draw Call Batching',
-    options: ['Merged', 'Separate', 'BatchedMesh'], default: 'Separate',
-  },
-  {
     id: 'textureFiles', label: 'Texture Files',
     options: ['Texture atlas', 'Separate'], default: 'Separate',
   },
@@ -82,6 +78,7 @@ export function initSidebar(onChange, defaults = {}) {
   let _matOpts = null;
   let _matSet  = null;
   let _matOnChange = null;
+  let _fabricsRow = null;
 
   // Config tab header
   const configHeader = document.createElement('div');
@@ -93,7 +90,7 @@ export function initSidebar(onChange, defaults = {}) {
   const configEl = document.createElement('div');
   configEl.className = 'sb-config';
 
-  const WIP_IDS = new Set(['modelComplexity', 'drawCallBatching', 'textureFiles']);
+  const WIP_IDS = new Set(['textureFiles']);
   const WIP_OPTS = new Set(['format:USDZ']);
 
   CATEGORIES.forEach((cat) => {
@@ -123,7 +120,7 @@ export function initSidebar(onChange, defaults = {}) {
       const normalized = VALS[rawDefault] ?? rawDefault;
       const activeSet = new Set(normalized.split(','));
       if (!activeSet.has('fullpbr')) activeSet.add('diffuse');
-      if (cat.id === 'fabrics') { _matOpts = opts; _matSet = activeSet; _matOnChange = () => onChange?.(cat.id, [...activeSet].join(',')); }
+      if (cat.id === 'fabrics') { _matOpts = opts; _matSet = activeSet; _matOnChange = () => onChange?.(cat.id, [...activeSet].join(',')); _fabricsRow = row; }
 
       cat.options.forEach((opt) => {
         const val = VALS[opt] ?? opt.toLowerCase().replace(/\s+/g, '');
@@ -438,6 +435,10 @@ export function initSidebar(onChange, defaults = {}) {
   }
 
   return {
+    setMaterialTabEnabled(enabled) {
+      if (!_fabricsRow) return;
+      _fabricsRow.classList.toggle('sb-row-disabled', !enabled);
+    },
     setMaterialCapabilities({ normal = true, roughness = true, ao = true }) {
       if (!_matOpts) return;
       const avail = { normal, roughness, ao };
